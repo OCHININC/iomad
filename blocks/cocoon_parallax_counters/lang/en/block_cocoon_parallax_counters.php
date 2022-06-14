@@ -1,0 +1,20 @@
+<?php
+$string['pluginname'] = '[Cocoon] Parallax Counters';
+$string['cocoon_parallax_counters'] = '[Cocoon] Parallax Counters';
+$string['cocoon_parallax_counters:addinstance'] = 'Add a new Gallery block';
+$string['cocoon_parallax_counters:myaddinstance'] = 'Add a new Gallery block to the My Moodle page';
+$string['config_title'] = 'Title';
+$string['config_subtitle'] = 'Subtitle';
+$string['config_image'] = 'Image';
+$string['config_counter_1'] = 'Counter number';
+$string['config_counter_1_text'] = 'Counter text';
+$string['config_counter_1_icon'] = 'Icon class';
+$string['config_counter_2'] = 'Counter number';
+$string['config_counter_2_text'] = 'Counter text';
+$string['config_counter_2_icon'] = 'Icon class';
+$string['config_counter_3'] = 'Counter number';
+$string['config_counter_3_text'] = 'Counter text';
+$string['config_counter_3_icon'] = 'Icon class';
+$string['config_counter_4'] = 'Counter number';
+$string['config_counter_4_text'] = 'Counter text';
+$string['config_counter_4_icon'] = 'Icon class';

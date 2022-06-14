@@ -1,0 +1,150 @@
+/**
+ * Cocoon Form Builder integration for Moodle
+ *
+ * @package    cocoon_form_builder
+ * @copyright  ©2021 Cocoon, XTRA Enterprises Ltd. createdbycocoon.com
+ * @author     Cocoon
+ */
+
+ .fb-button {
+  width: 140px;
+  height: 45px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
+  font-weight: 500;
+  color: #000;
+  background-color: #fff;
+  border: none;
+  border-radius: 45px;
+  box-shadow: 0px 8px 15px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease 0s;
+  cursor: pointer;
+  outline: none;
+  position: fixed;
+  bottom: 50px;
+  right: 50px;
+  z-index: 99;
+  text-align: center;
+  padding: 4px 0;
+  text-decoration: none;
+}
+.fb-button:hover {
+  background-color: #2EE59D;
+  box-shadow: 0px 15px 20px rgba(46, 229, 157, 0.4);
+  color: #fff;
+  transform: translateY(-7px);
+}
+/* #root {
+  display: none;
+  max-width: 90% !important;
+  max-height: 90% !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%,-50%) !important;
+  overflow: visible !important;
+}
+#app-pb-surround {
+  height: 90%;
+  overflow-y: scroll;
+} */
+body {
+  padding-top: 0 !important;
+}
+.MuiGrid-container {
+  align-items: center;
+}
+.tableItem {
+  border-bottom: 1px solid #e0e0e0;
+  margin-bottom: 12px !important;
+}
+.tableItem:hover {
+  background: #eee;
+}
+#searchForm .form-field label,
+#updateForm #controlled-tab-example-tabpane-settings label,
+#addNewForm #controlled-tab-example-tabpane-settings label {
+  font-size: 14px;
+  font-family: "Open Sans";
+  color: #0a0a0a;
+  line-height: 1.2;
+  font-weight: bold;
+  display: inline-block;
+  margin-right: 20px;
+  width: 100px;
+}
+#searchForm .form-field label + input,
+#updateForm #controlled-tab-example-tabpane-settings label + input,
+#addNewForm #controlled-tab-example-tabpane-settings label + input,
+#updateForm #controlled-tab-example-tabpane-recipients label + input,
+#addNewForm #controlled-tab-example-tabpane-recipients label + input {
+  display: inline-block;
+  height: calc(2.25rem + 2px);
+  padding: .375rem .75rem;
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.5;
+  color: #495057;
+  background-color: #fff;
+  background-clip: padding-box;
+  border: 1px solid #ced4da;
+  border-radius: .25rem;
+  transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+  min-width: 400px;
+}
+#updateForm #controlled-tab-example-tabpane-recipients .form-field > div > .form-field,
+#addNewForm #controlled-tab-example-tabpane-recipients .form-field > div > .form-field {
+  width: auto;
+  display: inline-block;
+  margin-right: 8px;
+}
+#updateForm #controlled-tab-example-tabpane-recipients .form-field > div > .form-field > button,
+#addNewForm #controlled-tab-example-tabpane-recipients .form-field > div > .form-field > button {
+  top: -1px;
+  height: 37px;
+}
+#searchForm .form-field label + select,
+#updateForm #controlled-tab-example-tabpane-settings label + select,
+#addNewForm #controlled-tab-example-tabpane-settings label + select {
+  display: inline-block;
+  height: calc(2.25rem + 2px);
+  padding: .375rem 1.75rem .375rem .75rem;
+  font-weight: 400;
+  line-height: 1.5;
+  color: #495057;
+  vertical-align: middle;
+  background: url(data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3e%3cpath fill='%23343a40' d='M2 0L0 2h4zm0 5L0 3h4z'/%3e%3c/svg%3e) no-repeat right .75rem center/8px 10px;
+  background-color: #fff;
+  border: 1px solid #ced4da;
+  border-radius: .25rem;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  min-width: 400px;
+}
+#form-builder-main-menu .form-builder-menu-item {
+  display: inline-block;
+  font-weight: 400;
+  text-align: center;
+  vertical-align: middle;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  border: 1px solid transparent;
+  padding: .375rem .75rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  border-radius: .25rem;
+  transition: color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+  color: #fff;
+  background-color: #6c757d;
+  border-color: #6c757d;
+  text-decoration: none;
+  margin: 0 5px;
+}
+#form-builder-main-menu .form-builder-menu-item:hover,
+#form-builder-main-menu .form-builder-menu-item.active {
+  color: #6c757d;
+  background-color: #fff;
+}

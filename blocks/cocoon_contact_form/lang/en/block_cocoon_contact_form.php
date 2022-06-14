@@ -1,0 +1,27 @@
+<?php
+$string['pluginname'] = '[Cocoon] Contact Form';
+$string['cocoon_contact_form'] = '[Cocoon] Contact Form';
+$string['cocoon_contact_form:addinstance'] = 'Add a new contact form block';
+$string['cocoon_contact_form:myaddinstance'] = 'Add a new contact form block to the My Moodle page';
+$string['config_header_1'] = 'Feature 1';
+$string['config_header_2'] = 'Feature 2';
+$string['config_header_3'] = 'Feature 3';
+$string['config_header_4'] = 'Contact form';
+$string['config_header_5'] = 'Google map';
+$string['config_lectures'] = 'Lectures';
+$string['config_feature_1_title'] = 'Title';
+$string['config_feature_1_subtitle'] = 'Subtitle';
+$string['config_feature_1_icon'] = 'Icon class';
+$string['config_feature_2_title'] = 'Title';
+$string['config_feature_2_subtitle'] = 'Subtitle';
+$string['config_feature_2_icon'] = 'Icon class';
+$string['config_feature_3_title'] = 'Title';
+$string['config_feature_3_subtitle'] = 'Subtitle';
+$string['config_feature_3_icon'] = 'Icon class';
+$string['config_feature_1_title'] = 'Title';
+$string['config_feature_1_subtitle'] = 'Subtitle';
+$string['config_title'] = 'Title';
+$string['config_subtitle'] = 'Subtitle';
+$string['config_map_lat'] = 'Map latitude';
+$string['config_map_lng'] = 'Map longitude';
+$string['config_image'] = 'Image';
