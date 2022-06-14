@@ -1,0 +1,3 @@
+[submodule "auth/crowd"]
+	path = auth/crowd
+	url = https://github.com/OCHININC/ella-auth-crowd.git
