@@ -1,3 +1,6 @@
 [submodule "auth/crowd"]
 	path = auth/crowd
 	url = https://github.com/OCHININC/ella-auth-crowd.git
+[submodule "mod/zoom"]
+	path = mod/zoom
+	url = https://github.com/ncstate-delta/moodle-mod_zoom.git
