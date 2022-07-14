@@ -7,3 +7,7 @@
 [submodule "mod/questionnaire"]
 	path = mod/questionnaire
 	url = https://github.com/PoetOS/moodle-mod_questionnaire.git
+	branch = MOODLE_311_STABLE
+[submodule "availability/badge"]
+	path = availability/badge
+	url = https://github.com/tlock/moodle-availability_badge.git
