@@ -1383,6 +1383,7 @@ class company {
         // Create an event for this.
         $eventother = array('companyname' => $company->get_name(),
                             'companyid' => $company->id,
+                            'departmentid' => $departmentid,
                             'usertype' => $managertype,
                             'usertypename' => $managertypes[$managertype]);
         $event = \block_iomad_company_admin\event\company_user_assigned::create(array('context' => $systemcontext,
@@ -3373,7 +3374,7 @@ class company {
                 $companysql = "";
             }
 
-            $usercount = $DB->count_records_sql("SELECT COUNT(u.id) FROM
+            $usercount = $DB->count_records_sql("SELECT COUNT(DISTINCT u.id) FROM
                                                  {company_users} cu
                                                  JOIN {user} u ON (cu.userid = u.id)
                                                  WHERE cu.companyid = :companyid
