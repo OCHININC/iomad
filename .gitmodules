@@ -1,0 +1,12 @@
+[submodule "auth/crowd"]
+	path = auth/crowd
+	url = https://github.com/OCHININC/ella-auth-crowd.git
+[submodule "mod/zoom"]
+	path = mod/zoom
+	url = https://github.com/ncstate-delta/moodle-mod_zoom.git
+[submodule "mod/questionnaire"]
+	path = mod/questionnaire
+	url = https://github.com/PoetOS/moodle-mod_questionnaire.git
+[submodule "availability/badge"]
+	path = availability/badge
+	url = https://github.com/tlock/moodle-availability_badge.git
