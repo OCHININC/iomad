@@ -1,0 +1,83 @@
+.usermenu:focus-within,
+div.dropdown-item:focus-within,
+.form-autocomplete-suggestions li[aria-selected="true"] {
+  box-shadow: none;
+}
+.form-autocomplete-suggestions li:hover,
+.form-autocomplete-suggestions li:focus,
+.form-autocomplete-suggestions li[aria-selected="true"] {
+  background-color: [[setting:color_primary]];
+}
+.badge {
+  background-color: [[setting:color_accent]];
+}
+#page-my-index {
+  background-color: #f9fafc;
+}
+/* .btn.dropdown-toggle::after {
+  position: relative;
+  top: -3px;
+} */
+.dropdown.dropup .btn.dropdown-toggle::after {
+  position: relative;
+  top: 1px;
+}
+#ccnSettingsMenuContainer .dropdown-item:focus-within:not(:hover) {
+  color: #212529;
+  background: inherit;
+}
+#ccnSettingsMenuContainer .dropdown-item:focus-within:not(:hover) a {
+  color: #212529;
+}
+#ccnSettingsMenuContainer .dropdown-item:active,
+#ccnSettingsMenuContainer .dropdown-item:hover,
+#ccnSettingsMenuContainer .dropdown-item:focus {
+  background: [[setting:color_primary]];
+  color: #fff;
+}
+#ccnSettingsMenuContainer .dropdown-item:hover a {
+  color: #fff;
+}
+.simplesearchform input {
+  border-radius: 5px !important;
+}
+.simplesearchform .form-inline .input-group-append .btn {
+  margin-top: 0;
+  margin-bottom: 0;
+  margin-left: 4px;
+}
+.secondary-navigation {
+  padding: 0 0 30px 0;
+}
+.secondary-navigation .navigation {
+  border: 0;
+}
+.secondary-navigation .navigation .nav-tabs {
+  background: [[setting:color_primary]];
+  border-radius: 4px;
+  border: 0;
+  padding: 10px 15px;
+}
+.secondary-navigation .navigation .nav-tabs .nav-link {
+  color: #fff;
+  border: 0;
+  height: 43px;
+  line-height: 27px;
+  margin-right: 5px;
+  transition: .2s ease all;
+  border-radius: 5px !important;
+}
+.secondary-navigation .navigation .nav-tabs .nav-link.active,
+.secondary-navigation .navigation .nav-tabs .nav-link:hover,
+.secondary-navigation .navigation .nav-tabs .nav-link:focus,
+.secondary-navigation .navigation .nav-tabs .nav-link:active {
+  background: #fff;
+  color: [[setting:color_primary]];
+}
+.nav-tabs .dropdown-menu {
+  margin-top: 2px;
+}
+.dropdown-menu ,
+.nav-tabs .dropdown-menu{
+  border-radius: 6px;
+}
