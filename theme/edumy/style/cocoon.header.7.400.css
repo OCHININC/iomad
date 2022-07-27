@@ -1,0 +1,13 @@
+@media (min-width: 1000px) {
+  header.header-nav.ccnHeader7.menu_style_home_seven .ace-responsive-menu>li:first-child {
+    margin-right: 0;
+  }
+}
+.primary-navigation .navigation {
+  height: 120px;
+}
+@media (min-width: 1200px) {
+  .ccn_nav_group .primary-navigation {
+    max-width: 630px;
+  }
+}

@@ -1,0 +1,22 @@
+
+  <li class="user_setting ccn-settings-nav ccn-lang-menu">
+    <div class="dropdown">
+      <a class="lang_icon" href="#" data-toggle="dropdown"><img class="lang_icon" src="{{{current_icon}}}" /></a>
+      <div class="dropdown-menu notification_dropdown_content">
+        <div class="so_heading">
+          <p>{{strlang}}</p>
+        </div>
+        <div class="user_setting_content">
+          <div class="so_content" data-simplebar="init">
+            <nav class="list-group">
+              {{#langs}}
+                <a href="{{{url}}}">
+                  <div class="lang_icon_flag"><img src="{{icon}}" /></div>{{name}}
+                </a>
+              {{/langs}}
+            </nav>
+          </div>
+        </div>
+      </div>
+    </div>
+  </li>

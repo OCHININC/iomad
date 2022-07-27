@@ -1,0 +1,15 @@
+@media (min-width: 1200px) {
+  .ccn_nav_group {
+    justify-content: space-between;
+
+  }
+  .ccn_nav_group #respMenu {
+    display: flex;
+  }
+  .ccn_nav_group .primary-navigation {
+    max-width: 600px;
+  }
+  .ccn_context_frontend .ccnHeader11.header-nav.menu_style_home_one.home10:not(.stricky-fixed) ul.ace-responsive-menu {
+    left: auto;
+  }
+}
