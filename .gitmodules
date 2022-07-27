@@ -1,0 +1,24 @@
+[submodule "auth/crowd"]
+	path = auth/crowd
+	url = https://github.com/OCHININC/ella-auth-crowd.git
+[submodule "mod/zoom"]
+	path = mod/zoom
+	url = https://github.com/ncstate-delta/moodle-mod_zoom.git
+[submodule "mod/questionnaire"]
+	path = mod/questionnaire
+	url = https://github.com/PoetOS/moodle-mod_questionnaire.git
+[submodule "availability/badge"]
+	path = availability/badge
+	url = https://github.com/tlock/moodle-availability_badge.git
+[submodule "local/learningtools"]
+	path = local/learningtools
+	url = https://github.com/bdecentgmbh/moodle-local_learningtools
+[submodule "report/customsql"]
+	path = report/customsql
+	url = https://github.com/moodleou/moodle-report_customsql.git
+[submodule "mod/customcert"]
+	path = mod/customcert
+	url = https://github.com/mdjnelson/moodle-mod_customcert.git
+[submodule "local/analytics"]
+	path = local/analytics
+	url = https://github.com/mikeaveli007/moodle-local_analytics.git

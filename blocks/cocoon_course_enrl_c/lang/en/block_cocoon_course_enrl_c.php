@@ -1,0 +1,19 @@
+<?php
+$string['pluginname'] = '[Cocoon] Course Enrolment Custom';
+$string['cocoon_course_enrl_c'] = '[Cocoon] Course Enrolment Custom';
+$string['cocoon_course_enrl_c:addinstance'] = 'Add a new [Cocoon] Course Enrolment Custom block';
+$string['cocoon_course_enrl_c:myaddinstance'] = 'Add a new [Cocoon] Course Enrolment Custom block to the My Moodle page';
+$string['config_price_title'] = 'Price title';
+$string['config_price'] = 'Price';
+$string['config_full_price'] = 'Full price';
+$string['config_add_to_cart_text'] = 'Add to cart text';
+$string['config_add_to_cart_link'] = 'Add to cart link';
+$string['config_buy_now_text'] = 'Buy now text';
+$string['config_buy_now_link'] = 'Buy now link';
+$string['config_includes_title'] = 'Includes title';
+$string['config_video_text'] = 'Includes: Video text';
+$string['config_download_text'] = 'Includes: Download text';
+$string['config_access_text'] = 'Includes: Access text';
+$string['config_devices_text'] = 'Includes: Devices text';
+$string['config_assignments_text'] = 'Includes: Assignments text';
+$string['config_certificate_text'] = 'Includes: Certificate text';
