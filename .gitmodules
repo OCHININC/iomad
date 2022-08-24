@@ -10,3 +10,6 @@
 [submodule "availability/badge"]
 	path = availability/badge
 	url = https://github.com/tlock/moodle-availability_badge.git
+[submodule "local/learningtools"]
+	path = local/learningtools
+	url = https://github.com/bdecentgmbh/moodle-local_learningtools
