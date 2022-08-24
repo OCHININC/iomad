@@ -51,6 +51,11 @@ class editusers_table extends table_sql {
      */
     public function col_fullname($row) {
         $name = fullname($row, has_capability('moodle/site:viewfullnames', $this->get_context()));
+
+        // Deal with suspended users.
+        if (!empty($row->suspended)) {
+            $name = format_string("$name (S)");
+        }
         return $name;
     }
 
@@ -353,7 +358,7 @@ class editusers_table extends table_sql {
      *      as a key when storing table properties like sort order in the session.
      */
     function __construct($uniqueid) {
-        global $DB, $companyid, $CFG;
+        global $DB, $companyid, $company, $USER, $CFG;
 
         $context = context_system::instance();
         $this->uniqueid = $uniqueid;
