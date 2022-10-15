@@ -337,6 +337,31 @@ function trainingevent_event_clashes($event, $userid) {
     }
 }
 
+
+function trainingevent_user_attending($event) {
+    global $DB, $CFG;
+
+    // Does the training event even exist?
+    if (!$trainingevent = $DB->get_record('trainingevent', ['id' => $event->objectid])) {
+        return false;
+    }
+
+    // Is the event exclusive?
+    if (empty($trainingevent->isexclusive)) {
+        return;
+    }
+
+    // Are there any other exclusive events on the same course?
+    if ($exclusiveevents = $DB->get_records('trainingevent', ['course' => $trainingevent->course, 'isexclusive' => 1])) {
+        // Is the user on a waitlist?
+        foreach ($exclusiveevents as $exclusiveevent) {
+            $DB->delete_records('trainingevent_users', ['trainingeventid' => $exclusiveevent->id, 'userid' => $event->userid, 'waitlisted' => 1]);
+        }
+    } else {
+        return;
+    }
+}
+
 function trainingevent_user_removed($event) {
     global $DB, $CFG;
 
@@ -347,6 +372,11 @@ function trainingevent_user_removed($event) {
 
     // Does it have a waiting list?
     if (empty($trainingevent->haswaitinglist)) {
+        return;
+    }
+
+    // Is this removal from the waiting list?
+    if (!empty($event->other['waitlisted'])) {
         return;
     }
 

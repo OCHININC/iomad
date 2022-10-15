@@ -41,10 +41,12 @@ class company_license_table extends table_sql {
      * @return string HTML content to go inside the td.
      */
     public function col_type($row) {
-        $licensetypes = array(get_string('standard', 'block_iomad_company_admin'),
-                              get_string('reusable', 'block_iomad_company_admin'),
-                              get_string('educator', 'block_iomad_company_admin'),
-                              get_string('educatorreusable', 'block_iomad_company_admin'));        $return = "";
+        $licensetypes = [0 => get_string('standard', 'block_iomad_company_admin'),
+                         1 => get_string('reusable', 'block_iomad_company_admin'),
+                         2 => get_string('educator', 'block_iomad_company_admin'),
+                         3 => get_string('educatorreusable', 'block_iomad_company_admin'),
+                         4 => get_string('blanket', 'block_iomad_company_admin')];
+
         return $licensetypes[$row->type];
     }
 
@@ -185,7 +187,7 @@ class company_license_table extends table_sql {
      * @return string HTML content to go inside the td.
      */
     public function col_actions($row) {
-        global $OUTPUT, $params, $context, $gotchildren, $departmentid;
+        global $OUTPUT, $DB, $USER, $params, $context, $gotchildren, $departmentid;
 
         $stredit   = get_string('edit');
         $strdelete = get_string('delete');
@@ -218,7 +220,7 @@ class company_license_table extends table_sql {
                                             SELECT companyid FROM {companylicense}
                                             WHERE id = :parentid)",
                                          array('userid' => $USER->id,
-                                               'parentid' => $license->parentid))) {
+                                               'parentid' => $row->parentid))) {
                 $deletebutton = "<a class='btn btn-primary' href='".
                                  new moodle_url('company_license_list.php', array('delete' => $row->id,
                                                                                   'sesskey' => sesskey())) ."'>$strdelete</a>";

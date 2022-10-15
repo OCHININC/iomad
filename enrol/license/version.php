@@ -24,5 +24,4 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component  = 'enrol_license';
-$plugin->version = 2019082300;
-$plugin->cron    = 180;
+$plugin->version = 2022100601;

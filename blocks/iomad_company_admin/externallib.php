@@ -42,7 +42,10 @@ class block_iomad_company_admin_external extends external_api {
                             'name' => new external_value(PARAM_TEXT, 'Company long name'),
                             'shortname' => new external_value(PARAM_TEXT, 'Compay short name'),
                             'code' => new external_value(PARAM_TEXT, 'Company code', VALUE_DEFAULT, ''),
+                            'address' => new external_value(PARAM_TEXT, 'Company location address', VALUE_OPTIONAL),
                             'city' => new external_value(PARAM_TEXT, 'Company location city'),
+                            'region' => new external_value(PARAM_TEXT, 'Company location region', VALUE_OPTIONAL),
+                            'postcode' => new external_value(PARAM_TEXT, 'Company location postcode', VALUE_OPTIONAL),
                             'country' => new external_value(PARAM_TEXT, 'Company location country'),
                             'maildisplay' => new external_value(PARAM_INT, 'User default email display', VALUE_DEFAULT, 2),
                             'mailformat' => new external_value(PARAM_INT, 'User default email format', VALUE_DEFAULT, 1),
@@ -66,6 +69,9 @@ class block_iomad_company_admin_external extends external_api {
                             'maincolor' => new external_value(PARAM_TEXT, 'Company main color', VALUE_DEFAULT, ''),
                             'headingcolor' => new external_value(PARAM_TEXT, 'Company heading color', VALUE_DEFAULT, ''),
                             'linkcolor' => new external_value(PARAM_TEXT, 'Company ink color', VALUE_DEFAULT, ''),
+                            'custom1' => new external_value(PARAM_TEXT, 'Company custom 1', VALUE_OPTIONAL),
+                            'custom2' => new external_value(PARAM_TEXT, 'Company custom 2', VALUE_OPTIONAL),
+                            'custom3' => new external_value(PARAM_TEXT, 'Company custom 3', VALUE_OPTIONAL),
                         )
                     )
                 )
@@ -85,7 +91,6 @@ class block_iomad_company_admin_external extends external_api {
 
         // Validate parameters
         $params = self::validate_parameters(self::create_companies_parameters(), array('companies' => $companies));
-echo "<pre>";print_r($params);die;
 
         // Get/check context/capability
         $context = context_system::instance();
@@ -165,7 +170,10 @@ echo "<pre>";print_r($params);die;
                      'id' => new external_value(PARAM_INT, 'Companid ID'),
                      'name' => new external_value(PARAM_TEXT, 'Company long name'),
                      'shortname' => new external_value(PARAM_TEXT, 'Compay short name'),
+                     'address' => new external_value(PARAM_TEXT, 'Company location address', VALUE_OPTIONAL),
                      'city' => new external_value(PARAM_TEXT, 'Company location city'),
+                     'region' => new external_value(PARAM_TEXT, 'Company location region'),
+                     'postcode' => new external_value(PARAM_TEXT, 'Company location postcode'),
                      'country' => new external_value(PARAM_TEXT, 'Company location country'),
                      'maildisplay' => new external_value(PARAM_INT, 'User default email display'),
                      'mailformat' => new external_value(PARAM_INT, 'User default email format'),
@@ -189,6 +197,9 @@ echo "<pre>";print_r($params);die;
                      'maincolor' => new external_value(PARAM_TEXT, 'Company main color', VALUE_DEFAULT, ''),
                      'headingcolor' => new external_value(PARAM_TEXT, 'Company heading color', VALUE_DEFAULT, ''),
                      'linkcolor' => new external_value(PARAM_TEXT, 'Company ink color', VALUE_DEFAULT, ''),
+                     'custom1' => new external_value(PARAM_TEXT, 'Company custom 1'),
+                     'custom2' => new external_value(PARAM_TEXT, 'Company custom 2'),
+                     'custom3' => new external_value(PARAM_TEXT, 'Company custom 3'),
                 )
             )
         );
@@ -268,14 +279,22 @@ echo "<pre>";print_r($params);die;
             $paramtype = PARAM_RAW;
             switch ($criteria['key']) {
                 case 'id':
+                case 'parentid':
                 case 'timezone':
                     $paramtype = PARAM_INT;
                     break;
                 case 'name':
                 case 'shortname':
                 case 'code':
+                case 'address':
                 case 'city':
+                case 'postcode':
+                case 'address':
+                case 'region':
                 case 'country':
+                case 'custom1':
+                case 'custom2':
+                case 'custom3':
                     $paramtype = PARAM_RAW;
                     break;
                 case 'lang':
@@ -307,6 +326,13 @@ echo "<pre>";print_r($params);die;
                 // Create the SQL.
                 switch ($criteria['key']) {
                     case 'id':
+                        $sql .= $criteria['key'] . ' = :' . $criteria['key'];
+                        $sqlparams[$criteria['key']] = $cleanedvalue;
+                        break;
+                    case 'parentid':
+                        $sql .= $criteria['key'] . ' = :' . $criteria['key'];
+                        $sqlparams[$criteria['key']] = $cleanedvalue;
+                        break;
                     case 'timezone':
                     case 'lang':
                     case 'suspended':
@@ -314,11 +340,48 @@ echo "<pre>";print_r($params);die;
                         $sqlparams[$criteria['key']] = $cleanedvalue;
                         break;
                     case 'name':
+                        $sql .= $DB->sql_like($criteria['key'], ':' . $criteria['key'], false);
+                        $sqlparams[$criteria['key']] = "%" . $cleanedvalue . "%";
+                        break;
                     case 'shortname':
+                        $sql .= $DB->sql_like($criteria['key'], ':' . $criteria['key'], false);
+                        $sqlparams[$criteria['key']] = "%" . $cleanedvalue . "%";
+                        break;
                     case 'city':
+                        $sql .= $DB->sql_like($criteria['key'], ':' . $criteria['key'], false);
+                        $sqlparams[$criteria['key']] = "%" . $cleanedvalue . "%";
+                        break;
+                    case 'address':
+                        $sql .= $DB->sql_like($criteria['key'], ':' . $criteria['key'], false);
+                        $sqlparams[$criteria['key']] = "%" . $cleanedvalue . "%";
+                        break;
+                    case 'postcode':
+                        $sql .= $DB->sql_like($criteria['key'], ':' . $criteria['key'], false);
+                        $sqlparams[$criteria['key']] = "%" . $cleanedvalue . "%";
+                        break;
+                    case 'region':
+                        $sql .= $DB->sql_like($criteria['key'], ':' . $criteria['key'], false);
+                        $sqlparams[$criteria['key']] = "%" . $cleanedvalue . "%";
+                        break;
+                    case 'code':
+                        $sql .= $DB->sql_like($criteria['key'], ':' . $criteria['key'], false);
+                        $sqlparams[$criteria['key']] = "%" . $cleanedvalue . "%";
+                        break;
+                    case 'custom1':
+                        $sql .= $DB->sql_like($criteria['key'], ':' . $criteria['key'], false);
+                        $sqlparams[$criteria['key']] = "%" . $cleanedvalue . "%";
+                        break;
+                    case 'custom2':
+                        $sql .= $DB->sql_like($criteria['key'], ':' . $criteria['key'], false);
+                        $sqlparams[$criteria['key']] = "%" . $cleanedvalue . "%";
+                        break;
+                    case 'custom3':
+                        $sql .= $DB->sql_like($criteria['key'], ':' . $criteria['key'], false);
+                        $sqlparams[$criteria['key']] = "%" . $cleanedvalue . "%";
+                        break;
                     case 'country':
                         $sql .= $DB->sql_like($criteria['key'], ':' . $criteria['key'], false);
-                        $sqlparams[$criteria['key']] = $cleanedvalue;
+                        $sqlparams[$criteria['key']] = "%" . $cleanedvalue . "%";
                         break;
                     default:
                         break;
@@ -346,7 +409,9 @@ echo "<pre>";print_r($params);die;
                          'name' => new external_value(PARAM_TEXT, 'Company long name'),
                          'shortname' => new external_value(PARAM_TEXT, 'Compay short name'),
                          'code' => new external_value(PARAM_TEXT, 'Compay code'),
+                         'address' => new external_value(PARAM_TEXT, 'Company location address', VALUE_OPTIONAL),
                          'city' => new external_value(PARAM_TEXT, 'Company location city'),
+                         'region' => new external_value(PARAM_TEXT, 'Company location region'),
                          'country' => new external_value(PARAM_TEXT, 'Company location country'),
                          'maildisplay' => new external_value(PARAM_INT, 'User default email display'),
                          'mailformat' => new external_value(PARAM_INT, 'User default email format'),
@@ -370,6 +435,9 @@ echo "<pre>";print_r($params);die;
                          'maincolor' => new external_value(PARAM_TEXT, 'Company main color', VALUE_DEFAULT, ''),
                          'headingcolor' => new external_value(PARAM_TEXT, 'Company heading color', VALUE_DEFAULT, ''),
                          'linkcolor' => new external_value(PARAM_TEXT, 'Company ink color', VALUE_DEFAULT, ''),
+                         'custom1' => new external_value(PARAM_TEXT, 'Company custom 1'),
+                         'custom2' => new external_value(PARAM_TEXT, 'Company custom 2'),
+                         'custom3' => new external_value(PARAM_TEXT, 'Company custom 3'),
                          )
                      )
                  ),
@@ -394,7 +462,9 @@ echo "<pre>";print_r($params);die;
                             'name' => new external_value(PARAM_TEXT, 'Company long name', VALUE_OPTIONAL),
                             'shortname' => new external_value(PARAM_TEXT, 'Compay short name', VALUE_OPTIONAL),
                             'code' => new external_value(PARAM_TEXT, 'Compay code', VALUE_OPTIONAL),
+                            'address' => new external_value(PARAM_TEXT, 'Company location address', VALUE_OPTIONAL),
                             'city' => new external_value(PARAM_TEXT, 'Company location city', VALUE_OPTIONAL),
+                            'region' => new external_value(PARAM_TEXT, 'Company location region', VALUE_OPTIONAL),
                             'country' => new external_value(PARAM_TEXT, 'Company location country', VALUE_OPTIONAL),
                             'maildisplay' => new external_value(PARAM_INT, 'User default email display', VALUE_OPTIONAL),
                             'mailformat' => new external_value(PARAM_INT, 'User default email format', VALUE_OPTIONAL),
@@ -418,6 +488,9 @@ echo "<pre>";print_r($params);die;
                             'maincolor' => new external_value(PARAM_TEXT, 'Company main color', VALUE_DEFAULT, ''),
                             'headingcolor' => new external_value(PARAM_TEXT, 'Company heading color', VALUE_DEFAULT, ''),
                             'linkcolor' => new external_value(PARAM_TEXT, 'Company ink color', VALUE_DEFAULT, ''),
+                            'custom1' => new external_value(PARAM_TEXT, 'Company custom 1', VALUE_OPTIONAL),
+                            'custom2' => new external_value(PARAM_TEXT, 'Company custom 2', VALUE_OPTIONAL),
+                            'custom3' => new external_value(PARAM_TEXT, 'Company custom 3', VALUE_OPTIONAL),
                         )
                     )
                 )

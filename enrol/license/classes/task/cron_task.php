@@ -15,31 +15,40 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Tests for deprecated events. Please add tests for deprecated events in this file.
+ * A scheduled task.
  *
- * @package    core
- * @category   phpunit
- * @copyright  2013 onwards Ankit Agarwal
+ * @package    enrol_license
+ * @copyright  2022 Derick Turner
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-
-defined('MOODLE_INTERNAL') || die();
+namespace enrol_license\task;
 
 /**
- * Class core_event_instances_list_viewed_testcase
+ * Simple task to run the license enrolment cron.
  *
- * Tests for deprecated events.
+ * @copyright  2022 Derick Turner
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class core_event_deprecated_testcase extends advanced_testcase {
+class cron_task extends \core\task\scheduled_task {
 
     /**
-     * Test event properties and methods.
+     * Get a descriptive name for this task (shown to admins).
+     *
+     * @return string
      */
-    public function test_deprecated_course_module_instances_list_viewed_events() {
-
-        // Make sure the abstract class course_module_instances_list_viewed generates a debugging notice.
-        require_once(__DIR__.'/fixtures/event_mod_badfixtures.php');
-        $this->assertDebuggingCalled(null, DEBUG_DEVELOPER);
-
+    public function get_name() {
+        return get_string('licensecrontask', 'enrol_license');
     }
+
+    /**
+     * Do the job.
+     * Throw exceptions on errors (the job will be retried).
+     */
+    public function execute() {
+        global $CFG;
+        require_once($CFG->dirroot . '/enrol/license/lib.php');
+        $license = new \enrol_license_plugin();
+        $license->cron();
+    }
+
 }
