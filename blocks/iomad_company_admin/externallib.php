@@ -41,7 +41,7 @@ class block_iomad_company_admin_external extends external_api {
                         array(
                             'name' => new external_value(PARAM_TEXT, 'Company long name'),
                             'shortname' => new external_value(PARAM_TEXT, 'Compay short name'),
-                            'code' => new external_value(PARAM_TEXT, 'Company code', VALUE_DEFAULT, ''),
+                            'code' => new external_value(PARAM_CLEAN, 'Company code', VALUE_DEFAULT, ''),
                             'address' => new external_value(PARAM_TEXT, 'Company location address', VALUE_OPTIONAL),
                             'city' => new external_value(PARAM_TEXT, 'Company location city'),
                             'region' => new external_value(PARAM_TEXT, 'Company location region', VALUE_OPTIONAL),
@@ -104,13 +104,14 @@ class block_iomad_company_admin_external extends external_api {
 
             // does this company already exist
             if ($DB->get_record('company', array('name' => $company['name']))) {
-                throw new invalid_parameter_exception('Company name is already being used');
+                throw new invalid_parameter_exception('Company name ' . $company['name'] . ' is already being used');
             }
             if ($DB->get_record('company', array('shortname' => $company['shortname']))) {
-                throw new invalid_parameter_exception('Company shortname is already being used');
+                throw new invalid_parameter_exception('Company shortname ' . $company['shortname'] . ' is already being used');
             }
-            if ($DB->get_record('company', array('code' => $company['code']))) {
-                throw new invalid_parameter_exception('Company code is already being used');
+            if (!empty($company['code']) &&
+                $DB->get_record('company', array('code' => $company['code']))) {
+                throw new invalid_parameter_exception('Company code ' . $company['code'] . ' is already being used');
             }
 
             // Create the company record
@@ -170,7 +171,7 @@ class block_iomad_company_admin_external extends external_api {
                      'id' => new external_value(PARAM_INT, 'Companid ID'),
                      'name' => new external_value(PARAM_TEXT, 'Company long name'),
                      'shortname' => new external_value(PARAM_TEXT, 'Compay short name'),
-                     'address' => new external_value(PARAM_TEXT, 'Company location address', VALUE_OPTIONAL),
+                     'address' => new external_value(PARAM_TEXT, 'Company location address'),
                      'city' => new external_value(PARAM_TEXT, 'Company location city'),
                      'region' => new external_value(PARAM_TEXT, 'Company location region'),
                      'postcode' => new external_value(PARAM_TEXT, 'Company location postcode'),
@@ -185,18 +186,18 @@ class block_iomad_company_admin_external extends external_api {
                      'timezone' => new external_value(PARAM_TEXT, 'User default timezone'),
                      'lang' => new external_value(PARAM_TEXT, 'User default language'),
                      'suspended' => new external_value(PARAM_INT, 'Company is suspended when <> 0'),
-                     'ecommerce' => new external_value(PARAM_INT, 'Ecommerce is disabled when = 0', VALUE_DEFAULT, 0),
-                     'parentid' => new external_value(PARAM_INT, 'ID of parent company', VALUE_DEFAULT, 0),
-                     'customcss' => new external_value(PARAM_TEXT, 'Company custom css', VALUE_DEFAULT, ''),
-                     'validto' => new external_value(PARAM_INT, 'Contract termination date in unix timestamp', VALUE_DEFAULT, null),
-                     'suspendafter' => new external_value(PARAM_INT, 'Number of seconds after termination date to suspend the company', VALUE_DEFAULT, 0),
-                     'companyterminated' => new external_value(PARAM_INT, 'Company contract is terminated when <> 0', VALUE_DEFAULT, 0),
-                     'theme' => new external_value(PARAM_TEXT, 'Company theme', VALUE_DEFAULT, ''),
-                     'hostname' => new external_value(PARAM_TEXT, 'Company hostname', VALUE_DEFAULT, ''),
-                     'maxusers' => new external_value(PARAM_INT, 'Company maximum number of users', VALUE_DEFAULT, 0),
-                     'maincolor' => new external_value(PARAM_TEXT, 'Company main color', VALUE_DEFAULT, ''),
-                     'headingcolor' => new external_value(PARAM_TEXT, 'Company heading color', VALUE_DEFAULT, ''),
-                     'linkcolor' => new external_value(PARAM_TEXT, 'Company ink color', VALUE_DEFAULT, ''),
+                     'ecommerce' => new external_value(PARAM_INT, 'Ecommerce is disabled when = 0'),
+                     'parentid' => new external_value(PARAM_INT, 'ID of parent company'),
+                     'customcss' => new external_value(PARAM_TEXT, 'Company custom css'),
+                     'validto' => new external_value(PARAM_INT, 'Contract termination date in unix timestamp'),
+                     'suspendafter' => new external_value(PARAM_INT, 'Number of seconds after termination date to suspend the company'),
+                     'companyterminated' => new external_value(PARAM_INT, 'Company contract is terminated when <> 0'),
+                     'theme' => new external_value(PARAM_TEXT, 'Company theme'),
+                     'hostname' => new external_value(PARAM_TEXT, 'Company hostname'),
+                     'maxusers' => new external_value(PARAM_INT, 'Company maximum number of users'),
+                     'maincolor' => new external_value(PARAM_TEXT, 'Company main color'),
+                     'headingcolor' => new external_value(PARAM_TEXT, 'Company heading color'),
+                     'linkcolor' => new external_value(PARAM_TEXT, 'Company ink color'),
                      'custom1' => new external_value(PARAM_TEXT, 'Company custom 1'),
                      'custom2' => new external_value(PARAM_TEXT, 'Company custom 2'),
                      'custom3' => new external_value(PARAM_TEXT, 'Company custom 3'),
@@ -408,7 +409,7 @@ class block_iomad_company_admin_external extends external_api {
                          'id' => new external_value(PARAM_INT, 'Companid ID'),
                          'name' => new external_value(PARAM_TEXT, 'Company long name'),
                          'shortname' => new external_value(PARAM_TEXT, 'Compay short name'),
-                         'code' => new external_value(PARAM_TEXT, 'Compay code'),
+                         'code' => new external_value(PARAM_CLEAN, 'Compay code'),
                          'address' => new external_value(PARAM_TEXT, 'Company location address', VALUE_OPTIONAL),
                          'city' => new external_value(PARAM_TEXT, 'Company location city'),
                          'region' => new external_value(PARAM_TEXT, 'Company location region'),
@@ -425,7 +426,7 @@ class block_iomad_company_admin_external extends external_api {
                          'suspended' => new external_value(PARAM_INT, 'Company is suspended when <> 0'),
                          'ecommerce' => new external_value(PARAM_INT, 'Ecommerce is disabled when = 0', VALUE_DEFAULT, 0),
                          'parentid' => new external_value(PARAM_INT, 'ID of parent company', VALUE_DEFAULT, 0),
-                         'customcss' => new external_value(PARAM_TEXT, 'Company custom css'),
+                         'customcss' => new external_value(PARAM_TEXT, 'Company custom css', VALUE_DEFAULT, ''),
                          'validto' => new external_value(PARAM_INT, 'Contract termination date in unix timestamp', VALUE_DEFAULT, null),
                          'suspendafter' => new external_value(PARAM_INT, 'Number of seconds after termination date to suspend the company', VALUE_DEFAULT, 0),
                          'companyterminated' => new external_value(PARAM_INT, 'Company contract is terminated when <> 0', VALUE_DEFAULT, 0),
@@ -461,9 +462,10 @@ class block_iomad_company_admin_external extends external_api {
                             'id' => new external_value(PARAM_INT, 'Company id number'),
                             'name' => new external_value(PARAM_TEXT, 'Company long name', VALUE_OPTIONAL),
                             'shortname' => new external_value(PARAM_TEXT, 'Compay short name', VALUE_OPTIONAL),
-                            'code' => new external_value(PARAM_TEXT, 'Compay code', VALUE_OPTIONAL),
+                            'code' => new external_value(PARAM_CLEAN, 'Compay code', VALUE_OPTIONAL),
                             'address' => new external_value(PARAM_TEXT, 'Company location address', VALUE_OPTIONAL),
                             'city' => new external_value(PARAM_TEXT, 'Company location city', VALUE_OPTIONAL),
+                            'postcode' => new external_value(PARAM_TEXT, 'Company location postcode', VALUE_OPTIONAL),
                             'region' => new external_value(PARAM_TEXT, 'Company location region', VALUE_OPTIONAL),
                             'country' => new external_value(PARAM_TEXT, 'Company location country', VALUE_OPTIONAL),
                             'maildisplay' => new external_value(PARAM_INT, 'User default email display', VALUE_OPTIONAL),
@@ -475,19 +477,19 @@ class block_iomad_company_admin_external extends external_api {
                             'screenreader' => new external_value(PARAM_INT, 'User default screen reader', VALUE_OPTIONAL),
                             'timezone' => new external_value(PARAM_TEXT, 'User default timezone', VALUE_OPTIONAL),
                             'lang' => new external_value(PARAM_TEXT, 'User default language', VALUE_OPTIONAL),
-                            'suspended' => new external_value(PARAM_INT, 'Company is suspended when <> 0', VALUE_DEFAULT, 0),
-                            'ecommerce' => new external_value(PARAM_INT, 'Ecommerce is disabled when = 0', VALUE_DEFAULT, 0),
-                            'parentid' => new external_value(PARAM_INT, 'ID of parent company', VALUE_DEFAULT, 0),
-                            'customcss' => new external_value(PARAM_TEXT, 'Company custom css'),
-                            'validto' => new external_value(PARAM_INT, 'Contract termination date in unix timestamp', VALUE_DEFAULT, null),
-                            'suspendafter' => new external_value(PARAM_INT, 'Number of seconds after termination date to suspend the company', VALUE_DEFAULT, 0),
-                            'companyterminated' => new external_value(PARAM_INT, 'Company contract is terminated when <> 0', VALUE_DEFAULT, 0),
-                            'theme' => new external_value(PARAM_TEXT, 'Company theme', VALUE_DEFAULT, ''),
-                            'hostname' => new external_value(PARAM_TEXT, 'Company hostname', VALUE_DEFAULT, ''),
-                            'maxusers' => new external_value(PARAM_INT, 'Company maximum number of users', VALUE_DEFAULT, 0),
-                            'maincolor' => new external_value(PARAM_TEXT, 'Company main color', VALUE_DEFAULT, ''),
-                            'headingcolor' => new external_value(PARAM_TEXT, 'Company heading color', VALUE_DEFAULT, ''),
-                            'linkcolor' => new external_value(PARAM_TEXT, 'Company ink color', VALUE_DEFAULT, ''),
+                            'suspended' => new external_value(PARAM_INT, 'Company is suspended when <> 0', VALUE_OPTIONAL),
+                            'ecommerce' => new external_value(PARAM_INT, 'Ecommerce is disabled when = 0', VALUE_OPTIONAL),
+                            'parentid' => new external_value(PARAM_INT, 'ID of parent company', VALUE_OPTIONAL),
+                            'customcss' => new external_value(PARAM_TEXT, 'Company custom css', VALUE_OPTIONAL),
+                            'validto' => new external_value(PARAM_INT, 'Contract termination date in unix timestamp', VALUE_OPTIONAL),
+                            'suspendafter' => new external_value(PARAM_INT, 'Number of seconds after termination date to suspend the company', VALUE_OPTIONAL),
+                            'companyterminated' => new external_value(PARAM_INT, 'Company contract is terminated when <> 0', VALUE_OPTIONAL),
+                            'theme' => new external_value(PARAM_TEXT, 'Company theme', VALUE_OPTIONAL),
+                            'hostname' => new external_value(PARAM_TEXT, 'Company hostname', VALUE_OPTIONAL),
+                            'maxusers' => new external_value(PARAM_INT, 'Company maximum number of users', VALUE_OPTIONAL),
+                            'maincolor' => new external_value(PARAM_TEXT, 'Company main color', VALUE_OPTIONAL),
+                            'headingcolor' => new external_value(PARAM_TEXT, 'Company heading color', VALUE_OPTIONAL),
+                            'linkcolor' => new external_value(PARAM_TEXT, 'Company ink color', VALUE_OPTIONAL),
                             'custom1' => new external_value(PARAM_TEXT, 'Company custom 1', VALUE_OPTIONAL),
                             'custom2' => new external_value(PARAM_TEXT, 'Company custom 2', VALUE_OPTIONAL),
                             'custom3' => new external_value(PARAM_TEXT, 'Company custom 3', VALUE_OPTIONAL),
@@ -552,7 +554,8 @@ class block_iomad_company_admin_external extends external_api {
                 }
             }
 
-            if ($duplicate = $DB->get_record('company', array('code' => $oldcompany->code))) {
+            if (!empty($oldcompany->code) &&
+                $duplicate = $DB->get_record('company', array('code' => $oldcompany->code))) {
                 if ($duplicate->id != $oldcompany->id) {
                     throw new invalid_parameter_exception('Duplicate company code');
                 }
@@ -728,6 +731,142 @@ class block_iomad_company_admin_external extends external_api {
                                 'shortname' => new external_value(PARAM_TEXT, 'Department short name'),
                                 'company' => new external_value(PARAM_INT, 'Company ID'),
                                 'parent' => new external_value(PARAM_INT, 'Department parent id'),
+                                )
+                            )
+                       ),
+                      'warnings' => new external_warnings('always set to \'key\'', 'faulty key name')
+                    )
+                );
+    }
+
+    /**
+     * block_iomad_company_admin_get_company_courses
+     *
+     * Return description of method parameters
+     * @return external_function_parameters
+     */
+    public static function get_company_courses_parameters() {
+        return new external_function_parameters(
+            array(
+                'criteria' => new external_multiple_structure(
+                    new external_single_structure(
+                        array(
+                            'companyid' => new external_value(PARAM_INT, 'the company id', VALUE_DEFAULT, 0),
+                            'shared' => new  external_value(PARAM_INT, 'Show all of the shared courses availabe to the company', VALUE_DEFAULT, 0),
+                        )
+                    )
+               )
+            )
+        );
+    }
+
+    /**
+     * block_iomad_company_admin_get_company_courses
+     *
+     * Implement get_company_courses
+     * @param $companyid
+     * @return array of course records.
+     */
+    public static function get_company_courses($criteria = array()) {
+        global $CFG, $DB;
+
+        // Validate parameters
+        $params = self::validate_parameters(self::get_company_courses_parameters(), array('criteria' => $criteria));
+
+            // Get/check context/capability
+        $context = context_system::instance();
+        self::validate_context($context);
+        require_capability('block/iomad_company_admin:viewcourses', $context);
+
+        // Validate the criteria and retrieve the users.
+        $params = $params['criteria'][0]; 
+        $courses = array();
+        $warnings = array();
+        $sqlparams = array();
+        $sql = ' company != 0 ';
+
+        if (!empty($params['companyid'])) {
+            $companies = $DB->get_records('company', ['id' => $params['companyid']], 'id', 'id,name,shortname,code,address,city,region,postcode,country,custom1,custom2,custom3'); 
+        } else {
+            $companies = $DB->get_records('company', ['suspended' => 0], 'id', 'id,name,shortname,code,address,city,region,postcode,country,custom1,custom2,custom3'); 
+        }
+
+        foreach ($companies as $companyid => $company) {
+            $comp = new company($company->id);
+            $companycourses = [];
+            $courses = $comp->get_menu_courses($params['shared'], false, false, false);
+            foreach ($courses as $courseid => $course) {
+                $companycourses[$courseid] = (object) ['id' => $courseid, 'fullname' => $course];
+                $customfieldsraw = $DB->get_records_sql("SELECT cfd.id, cff.name,cff.type,cff.configdata, cfd.value
+                                                         FROM {customfield_data} cfd
+                                                         JOIN {customfield_field} cff ON (cfd.fieldid = cff.id)
+                                                         WHERE cfd.instanceid = :courseid",
+                                                         ['courseid' => $courseid]);
+                $customfields = [];
+                foreach ($customfieldsraw as $rawfield) {
+                        $customfields[$rawfield->id] = (object) ['id' => $rawfield->id, 'name' => $rawfield->name];
+                    if ($rawfield->type == 'date') {
+                        $customfields[$rawfield->id]->value = date("Y-m-d H:i:s", $rawfield->value);
+                    } else if ($rawfield->type == 'select') {
+                        $configdata = json_decode($rawfield->configdata);
+                        $options = preg_split("/\s*\n\s*/", trim($configdata->options));
+                        if ($rawfield->value == 0) {
+                            $customfields[$rawfield->id]->value = $configdata->default;
+                        } else {
+                            $customfields[$rawfield->id]->value = $options[$rawfield->value - 1];
+                        }
+                    } else {
+                        $customfields[$rawfield->id]->value = $rawfield->value;
+                    }
+                }
+                $companycourses[$courseid]->customfields = $customfields;
+            }
+            $companies[$companyid]->courses = $companycourses;
+        }
+
+        return array('companies' => $companies, 'warnings' => $warnings);
+    }
+
+     /**
+     * block_iomad_company_admin_get_company_courses
+     *
+     * Returns description of method result value
+     * @return external_description
+     */
+    public static function get_company_courses_returns() {
+        return new external_single_structure(
+                array('companies' => new external_multiple_structure(
+                        new external_single_structure(
+                            array(
+                                'id' => new external_value(PARAM_INT, 'Company ID'),
+                                'name' => new external_value(PARAM_TEXT, 'Company name'),
+                                'shortname' => new external_value(PARAM_TEXT, 'Company shortname'),
+                                'code' => new external_value(PARAM_CLEAN, 'Company code'),
+                                'address' => new external_value(PARAM_TEXT, 'Company address'),
+                                'city' => new external_value(PARAM_TEXT, 'Company city'),
+                                'region' => new external_value(PARAM_TEXT, 'Company region'),
+                                'postcode' => new external_value(PARAM_TEXT, 'Company postcode'),
+                                'country' => new external_value(PARAM_TEXT, 'Company country'),
+                                'custom1' => new external_value(PARAM_TEXT, 'Company custom1'),
+                                'custom2' => new external_value(PARAM_TEXT, 'Company custom2'),
+                                'custom3' => new external_value(PARAM_TEXT, 'Company custom3'),
+                                'courses' => new external_multiple_structure(
+                                    new external_single_structure(
+                                       array(
+                                            'id' => new external_value(PARAM_INT, 'Course ID'),
+                                            'fullname' => new external_value(PARAM_TEXT, 'Course full name'),
+                                            'customfields' => new external_multiple_structure(
+                                                new external_single_structure(
+                                                    array(
+                                                          'id' => new external_value(PARAM_INT, 'Custom field id'),
+                                                          'name' => new external_value(PARAM_TEXT, 'Custom field name'),
+                                                          'value' => new external_value(PARAM_RAW, 'Custom field data value'),
+                                                          )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                   )
                                 )
                             )
                        ),
