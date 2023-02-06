@@ -13,3 +13,9 @@
 [submodule "local/learningtools"]
 	path = local/learningtools
 	url = https://github.com/bdecentgmbh/moodle-local_learningtools
+[submodule "moodle-local_analytics"]
+	path = moodle-local_analytics
+	url = https://github.com/mikeaveli007/moodle-local_analytics.git
+[submodule "moodle-report_customsql"]
+	path = moodle-report_customsql
+	url = https://github.com/moodleou/moodle-report_customsql.git
