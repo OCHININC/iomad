@@ -388,7 +388,6 @@ class iomad {
             return $categories;
         }
 
-        //if (empty($userid)) {
         $companyid = iomad::get_my_companyid(context_system::instance());
         $company = $DB->get_record('company', ['id' => $companyid]);
 
@@ -416,6 +415,20 @@ class iomad {
             $mycompanycategories = [];
         }
 
+        // Get the categories for the courses the user is enrolled on.
+        $usercourses = enrol_get_users_courses($USER->id);
+        $usercategories = [];
+        foreach ($usercourses as $usercourse) {
+            $usercategories[$usercourse->category] = $usercourse->category;
+        }
+
+        // Get all of the categories of courses assigned to the company.
+        $companycourses = $DB->get_records_sql("SELECT distinct c.category
+                                                FROM {course} c
+                                                JOIN {company_course} cc ON (c.id = cc.courseid)
+                                                WHERE cc.companyid = :companyid",
+                                                ['companyid' => $companyid]);
+
         // Set up the return array;
         $iomadcategories = array();
 
@@ -426,8 +439,19 @@ class iomad {
             if (!empty($mycompanycategories[$id])) {
                 $iomadcategories[$id] = $category;
             }
+
             // Is this another company category?
             if (empty($allcompanycategories[$id])) {
+                $iomadcategories[$id] = $category;
+            }
+
+            // Is this a category which has a course you are enrolled on?
+            if (!empty($usercategories[$id])) {
+                $iomadcategories[$id] = $category;
+            }
+
+            // Is this a category for a course assigned to the company?
+            if (!empty($companycourses[$id])) {
                 $iomadcategories[$id] = $category;
             }
         }
@@ -751,7 +775,7 @@ class iomad {
      *
      * Return array();
      **/
-    public static function get_user_sqlsearch($params, $idlist='', $sort, $dir, $departmentid, $nogrades=false, $allcourse=false) {
+    public static function get_user_sqlsearch($params, $idlist='', $sort = "", $dir="ASC", $departmentid=0, $nogrades=false, $allcourse=false) {
         global $DB, $CFG;
 
         if ($allcourse) {
@@ -1293,7 +1317,7 @@ class iomad {
      *
      * Return array();
      **/
-    public static function get_course_license_summary_info($departmentid, $courseid=0, $showsuspended) {
+    public static function get_course_license_summary_info($departmentid, $courseid=0, $showsuspended=false) {
         global $DB;
 
         // Create a temporary table to hold the userids.

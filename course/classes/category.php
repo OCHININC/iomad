@@ -261,6 +261,13 @@ class core_course_category implements renderable, cacheable_object, IteratorAggr
             return null;
         }
 
+        // IOMAD - dont show categories which a user can't see.
+        $companycategories = iomad::iomad_filter_categories([$id => $id]);
+        if (empty($companycategories)) {
+            throw new moodle_exception('unknowncategory');
+            return null;
+        }
+
         // Try to get category from cache or retrieve from the DB.
         $coursecatrecordcache = cache::make('core', 'coursecatrecords');
         $coursecat = $coursecatrecordcache->get($id);
@@ -2699,10 +2706,11 @@ class core_course_category implements renderable, cacheable_object, IteratorAggr
             $thislist = array();
             foreach ($rs as $record) {
                 context_helper::preload_from_record($record);
-                $context = context_coursecat::instance($record->id);
                 $canview = self::can_view_category($record);
+                $context = context_coursecat::instance($record->id);
+                $filtercontext = \context_helper::get_navigation_filter_context($context);
                 $baselist[$record->id] = array(
-                    'name' => $canview ? format_string($record->name, true, array('context' => $context)) : false,
+                    'name' => $canview ? format_string($record->name, true, array('context' => $filtercontext)) : false,
                     'path' => $record->path
                 );
                 if (!$canview || (!empty($requiredcapability) && !has_all_capabilities($requiredcapability, $context))) {
@@ -3256,6 +3264,11 @@ class core_course_category implements renderable, cacheable_object, IteratorAggr
         // First, check the parent category.
         if ($parentcat->has_capabilities($permissionstocheck)) {
             return $parentcat;
+        }
+
+        // IOMAD
+        if (!iomad::has_capability('block/iomad_company_admin:company_view_all', context_system::instance())) {
+            return null;
         }
 
         // Check the child categories.
