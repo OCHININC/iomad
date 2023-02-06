@@ -13,12 +13,12 @@
 [submodule "local/learningtools"]
 	path = local/learningtools
 	url = https://github.com/bdecentgmbh/moodle-local_learningtools
-[submodule "local/analytics"]
-	path = local/analytics
-	url = https://github.com/moodleou/moodle-report_customsql.git
 [submodule "report/customsql"]
 	path = report/customsql
 	url = https://github.com/moodleou/moodle-report_customsql.git
 [submodule "mod/customcert"]
 	path = mod/customcert
 	url = https://github.com/mdjnelson/moodle-mod_customcert.git
+[submodule "local/analytics"]
+	path = local/analytics
+	url = https://github.com/mikeaveli007/moodle-local_analytics.git
