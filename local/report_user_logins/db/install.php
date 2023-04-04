@@ -26,7 +26,13 @@ defined('MOODLE_INTERNAL') || die();
 function xmldb_local_report_user_logins_install() {
     global $CFG, $DB;
 
-     upgrade_set_timeout(7200); // Set installation time to 2 hours as this takes a long time.
+    // Only do this if the logstore table exists.
+    $dbman = $DB->get_manager();
+    if (!$dbman->table_exists('logstore_standard_log')) {
+        return true;
+    }
+
+    upgrade_set_timeout(7200); // Set installation time to 2 hours as this takes a long time.
 
     // Populate the report table from any previous users.
     $users = $DB->get_records('user', array('deleted' => 0));
@@ -34,32 +40,16 @@ function xmldb_local_report_user_logins_install() {
     mtrace("Dealing with $total users");
     $count = 0;
     $warn = 10;
-    foreach ($users as $user) {
-        if ($user->currentlogin != 0) {
-            $totallogins = $DB->count_records('logstore_standard_log', array('userid' => $user->id, 'eventname' => '\core\event\user_loggedin'));
-        } else {
-            $totallogins = 0;
-        }
-        if ($user->currentlogin == 0 ) {
-            $user->currentlogin = null;
-        }
 
-        if ($user->firstaccess == 0 ) {
-            $user->firstaccess = null;
-        }
-
-        $DB->insert_record('local_report_user_logins', array('userid' => $user->id,
-                                                             'created' => $user->timecreated,
-                                                             'firstlogin' => $user->firstaccess,
-                                                             'lastlogin' => $user->currentlogin,
-                                                             'logincount' => $totallogins,
-                                                             'modifiedtime' => time()));
-        $count++;
-        if ($count * 100 / $total > $warn) {
-            mtrace ("$warn%");
-            $warn = $warn + 10;
-        }
-    }
+    $DB->execute("INSERT INTO {local_report_user_logins} (userid, created, firstlogin, lastlogin, logincount, modifiedtime) 
+                  SELECT id as userid,
+                         timecreated,
+                         NULLIF(firstaccess,0) AS firstaccess,
+                         NULLIF(currentlogin,0) AS currentlogin,
+                         IF (currentlogin = 0, 0, IFNULL((SELECT COUNT(id) FROM {logstore_standard_log} l WHERE u.id = l.userid AND eventname = :eventname),0)) AS totallogins,
+                         " . time() . " as modifiedtime
+                         FROM {user} u",
+                  array('eventname' => '\core\event\user_loggedin'));
 
     // Deal with any that may have been missed.
     if ($missedusers = $DB->get_records_sql("SELECT u.* FROM {user} u

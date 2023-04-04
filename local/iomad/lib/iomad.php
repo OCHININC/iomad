@@ -30,6 +30,25 @@ require_once($CFG->dirroot.'/lib/formslib.php');
 class iomad {
 
     /**
+     * Registers the IOMAD site
+     * @param $parms - (array)
+     */
+    public static function register_site($data) {
+        global $CFG;
+
+        // Add in the missing data.
+        $data['siteurl'] = $CFG->wwwroot;
+        $ch = curl_init('https://www.iomad.org/wp-json/contact-form-7/v1/contact-forms/4445/feedback');
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+
+        $response = curl_exec($ch);
+
+        curl_close($ch);
+    }
+
+    /**
      * Gets the current users company ID depending on
      * if the user is an admin and editing a company or is a
      * company user tied to a company.
@@ -49,10 +68,10 @@ class iomad {
         } else if (self::is_company_user()) {
             $companyid = self::companyid();
         } else if (self::has_capability('block/iomad_company_admin:edit_departments', $context) && $required) {
-            if (!empty($SESSION->company->id)) {
-                return $SESSION->company->id;
+            if (!empty($SESSION->currenteditingcompany)) {
+                return $SESSION->currenteditingcompany;
             } else {
-                redirect(new moodle_url('/my'), get_string('pleaseselect', 'block_iomad_company_admin'));
+                redirect(new moodle_url('/blocks/iomad_company_admin/index.php'), get_string('pleaseselect', 'block_iomad_company_admin'));
             }
         } else {
             $companyid = 0;
@@ -391,26 +410,37 @@ class iomad {
         $companyid = iomad::get_my_companyid(context_system::instance());
         $company = $DB->get_record('company', ['id' => $companyid]);
 
+        // Get the cache objects.
+        $allcompanycategoriescache = cache::make('local_iomad', 'allcompanycategories');
+        $companycategoriescache = cache::make('local_iomad', 'companycategories');
+        $companycoursecategoriescache = cache::make('local_iomad', 'companycoursecategories');
+
         // Get all of the company course categories including children.
-        $allcompanycategories = [];
-        $companyroots = $DB->get_records('company', [], 'category', 'category');
-        foreach ($companyroots as $companyroot) {
-            $allcompanycategories[$companyroot->category] = $companyroot->category;
-            $children = $DB->get_records_sql("SELECT DISTINCT id
-                                              FROM {course_categories}
-                                              WHERE " . $DB->sql_like("path", ":parentpath"),
-                                              ['parentpath' => "/" . $companyroot->category . "/%"]);
-            foreach ($children as $child) {
-                $allcompanycategories[$child->id] = $child->id;
+        if (!$allcompanycategories = $allcompanycategoriescache->get('all')) {
+            $allcompanycategories = [];
+            $companyroots = $DB->get_records('company', [], 'category', 'category');
+            foreach ($companyroots as $companyroot) {
+                $allcompanycategories[$companyroot->category] = $companyroot->category;
+                $children = $DB->get_records_sql("SELECT DISTINCT id
+                                                  FROM {course_categories}
+                                                  WHERE " . $DB->sql_like("path", ":parentpath"),
+                                                  ['parentpath' => "/" . $companyroot->category . "/%"]);
+                foreach ($children as $child) {
+                    $allcompanycategories[$child->id] = $child->id;
+                }
             }
+            $allcompanycategoriescache->set('all', $allcompanycategories);
         }
 
         // Get the current company course categories.
         if (!empty($company->category)) {
-            $mycompanycategories = $DB->get_records_sql("SELECT DISTINCT cc.id
-                                                         FROM {course_categories} cc
-                                                         WHERE " . $DB->sql_like('cc.path', ':companycategorysearch'),
-                                                         ['companycategorysearch' => '/' . $company->category . '%']);
+            if (!$mycompanycategories = $companycategoriescache->get($company->id)) {
+                $mycompanycategories = $DB->get_records_sql("SELECT DISTINCT cc.id
+                                                             FROM {course_categories} cc
+                                                             WHERE " . $DB->sql_like('cc.path', ':companycategorysearch'),
+                                                             ['companycategorysearch' => '/' . $company->category . '%']);
+                $companycategoriescache->set($company->id, $mycompanycategories);
+            }
         } else {
             $mycompanycategories = [];
         }
@@ -423,11 +453,21 @@ class iomad {
         }
 
         // Get all of the categories of courses assigned to the company.
-        $companycourses = $DB->get_records_sql("SELECT distinct c.category
-                                                FROM {course} c
-                                                JOIN {company_course} cc ON (c.id = cc.courseid)
-                                                WHERE cc.companyid = :companyid",
-                                                ['companyid' => $companyid]);
+        if (!$companycourses = $companycoursecategoriescache->get($company->id)) {
+            $companycourses = $DB->get_records_sql("SELECT distinct c.category
+                                                    FROM {course} c
+                                                    JOIN {company_course} cc ON (c.id = cc.courseid)
+                                                    WHERE cc.companyid = :companyid",
+                                                    ['companyid' => $companyid]);
+            $companycoursecategoriescache->set($company->id, $companycourses);
+        }
+
+        // Get all of the categories of open shared courses.
+        $sharedcourses = $DB->get_records_sql("SELECT distinct c.category
+                                               FROM {course} c
+                                               JOIN {iomad_courses} ic ON (c.id = ic.courseid)
+                                               WHERE ic.shared = 1",
+                                               []);
 
         // Set up the return array;
         $iomadcategories = array();
@@ -440,11 +480,6 @@ class iomad {
                 $iomadcategories[$id] = $category;
             }
 
-            // Is this another company category?
-            if (empty($allcompanycategories[$id])) {
-                $iomadcategories[$id] = $category;
-            }
-
             // Is this a category which has a course you are enrolled on?
             if (!empty($usercategories[$id])) {
                 $iomadcategories[$id] = $category;
@@ -452,6 +487,16 @@ class iomad {
 
             // Is this a category for a course assigned to the company?
             if (!empty($companycourses[$id])) {
+                $iomadcategories[$id] = $category;
+            }
+
+            // Is this an open shared course category?
+            if (!empty($sharedcourses[$id])) {
+                $iomadcategories[$id] = $category;
+            }
+
+            // Is this another company category?
+            if (empty($allcompanycategories[$id])) {
                 $iomadcategories[$id] = $category;
             }
         }

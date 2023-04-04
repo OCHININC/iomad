@@ -812,8 +812,8 @@ function initialise_local_config_cache() {
     if (!empty($CFG->siteidentifier) && !file_exists($bootstrapcachefile)) {
         $contents = "<?php
 // ********** This file is generated DO NOT EDIT **********
-\$CFG->siteidentifier = '" . addslashes($CFG->siteidentifier) . "';
-\$CFG->bootstraphash = '" . hash_local_config_cache() . "';
+\$CFG->siteidentifier = " . var_export($CFG->siteidentifier, true) . ";
+\$CFG->bootstraphash = " . var_export(hash_local_config_cache(), true) . ";
 // Only if the file is not stale and has not been defined.
 if (\$CFG->bootstraphash === hash_local_config_cache() && !defined('SYSCONTEXTID')) {
     define('SYSCONTEXTID', ".SYSCONTEXTID.");
@@ -868,7 +868,8 @@ function initialise_fullme() {
         $CFG->wwwrootdefault = $CFG->wwwroot;
 
         // Does this match a company hostname?
-        if ($companyrec = $DB->get_record('company', array('hostname' => $_SERVER['SERVER_NAME']))) {
+        if ($DB->get_manager()->table_exists('company') &&
+            ($companyrec = $DB->get_record('company', array('hostname' => $_SERVER['SERVER_NAME'])))) {
             $company = new company($companyrec->id);
 
             // Set the wwwroot to the company one using the same protocol.
