@@ -89,12 +89,17 @@ class user_edit_form extends \moodleform {
         $strrequired = get_string('required');
 
         // Deal with the name order sorting and required fields.
+        // *** Removing name fields since we are getting users from crowd ***
+
+        /*
         $necessarynames = useredit_get_required_name_fields();
         foreach ($necessarynames as $necessaryname) {
+            if($necessaryname ==)
             $mform->addElement('text', $necessaryname, get_string($necessaryname), 'maxlength="100" size="30"');
             $mform->addRule($necessaryname, $strrequired, 'required', null, 'client');
             $mform->setType($necessaryname, PARAM_NOTAGS);
         }
+        */
 
         // Do not show email field if change confirmation is pending.
         if (!empty($CFG->emailchangeconfirmation) and !empty($user->preference_newemail)) {
@@ -123,6 +128,9 @@ class user_edit_form extends \moodleform {
 
         /* /copied from /user/editlib.php */
 
+        // Removing password options since we use crowd auth
+
+        /*
         $mform->addElement('static', 'blankline', '', '');
         if (!empty($CFG->passwordpolicy)) {
             $mform->addElement('static', 'passwordpolicyinfo', '', print_password_policy());
@@ -145,7 +153,7 @@ class user_edit_form extends \moodleform {
         $mform->addElement('date_time_selector', 'due', get_string('senddate', 'block_iomad_company_admin'));
         $mform->disabledIf('due', 'sendnewpasswordemails', 'eq', '0');
         $mform->addHelpButton('due', 'senddate', 'block_iomad_company_admin');
-
+        */
 
         // Deal with company optional fields.
         $mform->addElement('header', 'category_id', get_string('advanced'));

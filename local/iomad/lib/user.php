@@ -172,10 +172,15 @@ class company_user {
             $data->managertype = 0;
         }
         // Create the user association.
-        $DB->insert_record('company_users', array('userid' => $user->id,
-                                                  'companyid' => $company->id,
-                                                  'managertype' => $data->managertype,
-                                                  'departmentid' => $data->departmentid));
+        // *** Add try catch to bypass dup error when bulk uploading users ***
+        try {
+            $DB->insert_record('company_users', array('userid' => $user->id,
+            'companyid' => $company->id,
+            'managertype' => $data->managertype,
+            'departmentid' => $data->departmentid));
+        } catch (Throwable $th) {
+            //throw $th;
+        }
 
         if ( isset($data->selectedcourses) ) {
             self::enrol($user, array_keys($data->selectedcourses));
