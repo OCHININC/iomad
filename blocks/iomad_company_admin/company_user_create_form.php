@@ -92,10 +92,10 @@ if ($mform->is_cancelled()) {
         //$data->lastname = trim($data->lastname);
 
         // *** Add data from crowd ***
-        $data->firstname = $crowduser->firstname;
-        $data->lastname = $crowduser->lastname;
-        $data->username = $crowduser->username;
-        $data->idnumber = $crowduser->idnumber;
+        $data->firstname = $crowduser['firstname'];
+        $data->lastname = $crowduser['lastname'];
+        $data->username = $crowduser['username'];
+        $data->idnumber = $crowduser['idnumber'];
         $data->auth = "crowd";
 
         $data->userid = $USER->id;
