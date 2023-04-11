@@ -82,102 +82,127 @@ if ($mform->is_cancelled()) {
     redirect($dashboardurl);
     die;
 } else if ($data = $mform->get_data()) {
-    // Trim first and lastnames
-    $data->firstname = trim($data->firstname);
-    $data->lastname = trim($data->lastname);
 
-    $data->userid = $USER->id;
-    if ($companyid > 0) {
-        $data->companyid = $companyid;
-    }
+    $crowdauth = get_auth_plugin('crowd');
+    $crowduser = $crowdauth->get_userinfo($data->email);
 
-    if (!$userid = company_user::create($data)) {
-        $this->verbose("Error inserting a new user in the database!");
-        if (!$this->get('ignore_errors')) {
-            die();
-        }
-    }
-    $user = new stdclass();
-    $user->id = $userid;
-    $data->id = $userid;
+    if ($crowduser) {
+        // Trim first and lastnames
+        //$data->firstname = trim($data->firstname);
+        //$data->lastname = trim($data->lastname);
 
-    // Save custom profile fields data.
-    profile_save_data($data);
-    \core\event\user_updated::create_from_userid($userid)->trigger();
+        // *** Add data from crowd ***
+        $data->firstname = $crowduser['firstname'];
+        $data->lastname = $crowduser['lastname'];
+        $data->username = $crowduser['username'];
+        $data->idnumber = $crowduser['idnumber'];
+        $data->auth = "crowd";
 
-    $systemcontext = context_system::instance();
-
-    // Check if we are assigning a different role to the user.
-    if (!empty($data->managertype || !empty($data->educator))) {
-        company::upsert_company_user($userid, $companyid, $data->deptid, $data->managertype, $data->educator);
-    }
-
-    // Assign the user to the default company department.
-    $parentnode = company::get_company_parentnode($companyid);
-    if (iomad::has_capability('block/iomad_company_admin:edit_all_departments', $systemcontext)) {
-        $userhierarchylevel = $parentnode->id;
-    } else {
-        $userlevel = $company->get_userlevel($USER);
-        $userhierarchylevel = key($userlevel);
-    }
-    company::assign_user_to_department($data->deptid, $userid);
-
-    // Enrol the user on the courses.
-    if (!empty($createcourses)) {
-        $userdata = $DB->get_record('user', array('id' => $userid));
-        company_user::enrol($userdata, $createcourses, $companyid);
-    }
-    // Assign and licenses.
-    if (!empty($licenseid)) {
-        $licenserecord = (array) $DB->get_record('companylicense', array('id' => $licenseid));
-        if (!empty($licenserecord['program'])) {
-            // If so the courses are not passed automatically.
-            $data->licensecourses =  $DB->get_records_sql_menu("SELECT c.id, clc.courseid FROM {companylicense_courses} clc
-                                                                   JOIN {course} c ON (clc.courseid = c.id
-                                                                   AND clc.licenseid = :licenseid)",
-                                                                   array('licenseid' => $licenserecord['id']));
+        $data->userid = $USER->id;
+        if ($companyid > 0) {
+            $data->companyid = $companyid;
         }
 
-        if (!empty($data->licensecourses)) {
-            $userdata = $DB->get_record('user', array('id' => $userid));
-            $count = $licenserecord['used'];
-            $numberoflicenses = $licenserecord['allocation'];
-            foreach ($data->licensecourses as $licensecourse) {
-                if ($count >= $numberoflicenses) {
-                    // Set the used amount.
-                    $licenserecord['used'] = $count;
-                    $DB->update_record('companylicense', $licenserecord);
-                    redirect(new moodle_url("/blocks/iomad_company_admin/company_license_users_form.php",
-                                             array('licenseid' => $licenseid, 'error' => 1)));
-                }
-
-                $issuedate = time();
-                $DB->insert_record('companylicense_users',
-                                    array('userid' => $userdata->id,
-                                          'licenseid' => $licenseid,
-                                          'issuedate' => $issuedate,
-                                          'licensecourseid' => $licensecourse));
-
-                // Create an event.
-                $eventother = array('licenseid' => $licenseid,
-                                    'issuedate' => $issuedate,
-                                    'duedate' => $data->due);
-                $event = \block_iomad_company_admin\event\user_license_assigned::create(array('context' => context_course::instance($licensecourse),
-                                                                                              'objectid' => $licenseid,
-                                                                                              'courseid' => $licensecourse,
-                                                                                              'userid' => $userdata->id,
-                                                                                              'other' => $eventother));
-                $event->trigger();
-                $count++;
+        if (!$userid = company_user::create($data)) {
+            $this->verbose("Error inserting a new user in the database!");
+            if (!$this->get('ignore_errors')) {
+                die();
             }
         }
-    }
+        $user = new stdclass();
+        $user->id = $userid;
+        $data->id = $userid;
 
-    if (isset($data->submitandback)) {
-        redirect($dashboardurl, get_string('usercreated', 'block_iomad_company_admin'), null, \core\output\notification::NOTIFY_SUCCESS);
-    } else {
-        redirect($linkurl, get_string('usercreated', 'block_iomad_company_admin'), null, \core\output\notification::NOTIFY_SUCCESS);
-    }
+        // Save custom profile fields data.
+        profile_save_data($data);
+        \core\event\user_updated::create_from_userid($userid)->trigger();
+
+        $systemcontext = context_system::instance();
+
+        // Check if we are assigning a different role to the user.
+        if (!empty($data->managertype || !empty($data->educator))) {
+            company::upsert_company_user($userid, $companyid, $data->deptid, $data->managertype, $data->educator);
+        }
+
+        // Assign the user to the default company department.
+        $parentnode = company::get_company_parentnode($companyid);
+        if (iomad::has_capability('block/iomad_company_admin:edit_all_departments', $systemcontext)) {
+            $userhierarchylevel = $parentnode->id;
+        } else {
+            $userlevel = $company->get_userlevel($USER);
+            $userhierarchylevel = key($userlevel);
+        }
+        company::assign_user_to_department($data->deptid, $userid);
+
+        // Enrol the user on the courses.
+        if (!empty($createcourses)) {
+            $userdata = $DB->get_record('user', array('id' => $userid));
+            company_user::enrol($userdata, $createcourses, $companyid);
+        }
+        // Assign and licenses.
+        if (!empty($licenseid)) {
+            $licenserecord = (array) $DB->get_record('companylicense', array('id' => $licenseid));
+            if (!empty($licenserecord['program'])) {
+                // If so the courses are not passed automatically.
+                $data->licensecourses =  $DB->get_records_sql_menu(
+                    "SELECT c.id, clc.courseid FROM {companylicense_courses} clc
+                                                                   JOIN {course} c ON (clc.courseid = c.id
+                                                                   AND clc.licenseid = :licenseid)",
+                    array('licenseid' => $licenserecord['id'])
+                );
+            }
+
+            if (!empty($data->licensecourses)) {
+                $userdata = $DB->get_record('user', array('id' => $userid));
+                $count = $licenserecord['used'];
+                $numberoflicenses = $licenserecord['allocation'];
+                foreach ($data->licensecourses as $licensecourse) {
+                    if ($count >= $numberoflicenses) {
+                        // Set the used amount.
+                        $licenserecord['used'] = $count;
+                        $DB->update_record('companylicense', $licenserecord);
+                        redirect(new moodle_url(
+                            "/blocks/iomad_company_admin/company_license_users_form.php",
+                            array('licenseid' => $licenseid, 'error' => 1)
+                        ));
+                    }
+
+                    $issuedate = time();
+                    $DB->insert_record(
+                        'companylicense_users',
+                        array(
+                            'userid' => $userdata->id,
+                            'licenseid' => $licenseid,
+                            'issuedate' => $issuedate,
+                            'licensecourseid' => $licensecourse
+                        )
+                    );
+
+                    // Create an event.
+                    $eventother = array(
+                        'licenseid' => $licenseid,
+                        'issuedate' => $issuedate,
+                        'duedate' => $data->due
+                    );
+                    $event = \block_iomad_company_admin\event\user_license_assigned::create(array(
+                        'context' => context_course::instance($licensecourse),
+                        'objectid' => $licenseid,
+                        'courseid' => $licensecourse,
+                        'userid' => $userdata->id,
+                        'other' => $eventother
+                    ));
+                    $event->trigger();
+                    $count++;
+                }
+            }
+        }
+
+        if (isset($data->submitandback)) {
+            redirect($dashboardurl, get_string('usercreated', 'block_iomad_company_admin'), null, \core\output\notification::NOTIFY_SUCCESS);
+        } else {
+            redirect($linkurl, get_string('usercreated', 'block_iomad_company_admin'), null, \core\output\notification::NOTIFY_SUCCESS);
+        }
+    } else print_error('invalidcrowduser', 'block_iomad_company_admin');
 }
 echo $output->header();
 
@@ -201,4 +226,3 @@ if ($createdok) {
 $mform->display();
 
 echo $output->footer();
-
