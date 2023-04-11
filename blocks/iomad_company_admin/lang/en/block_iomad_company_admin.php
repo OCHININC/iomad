@@ -762,3 +762,6 @@ $string['companyreporter_role'] = 'Company report only';
 $string['companyreporter'] = 'Company report only';
 $string['xdepartmentassignments'] = '{$a}\'s departments';
 $string['xrolesassignments'] = '{$a}\'s roles';
+
+// Custom stuff
+$string['invalidcrowduser'] = "User does not exist in crowd";
