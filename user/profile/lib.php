@@ -696,7 +696,7 @@ function profile_definition(MoodleQuickForm $mform, int $userid = 0): void {
     $categories = profile_get_user_fields_with_data_by_category($userid);
 
     // IOMAD - Filter categories which only apply to this company.
-    $categories = iomad::iomad_filter_profile_categories($categories, $userid);
+    if($userid != -1) $categories = iomad::iomad_filter_profile_categories($categories, $userid);
 
     foreach ($categories as $categoryid => $fields) {
         // Check first if *any* fields will be displayed.

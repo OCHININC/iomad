@@ -267,10 +267,12 @@ if ($frm and isset($frm->username)) {                             // Login WITH 
                     $mycompanyrec = $DB->get_record('company', array('id' => $mycompany->id));
                     if ($mycompanyrec->hostname != $currentcompany->hostname) {
                         if (empty($mycompanyrec->hostname)) {
-                            $companyurl = $CFG->wwwrootdefault;
+                            $companyurl = $CFG->wwwroot;
                         } else {
                             $companyurl = $_SERVER['REQUEST_SCHEME'] . "://" . $mycompanyrec->hostname;
                         }
+                    } else {
+                        $companyurl = $CFG->wwwroot;
                     }
                     $SESSION->currenteditingcompany = $mycompany->id;
                     $SESSION->company = $mycompanyrec;
@@ -281,7 +283,7 @@ if ($frm and isset($frm->username)) {                             // Login WITH 
             }
         }
 
-    /// Let's get them all set up.
+        /// Let's get them all set up.
         complete_user_login($user);
 
         \core\session\manager::apply_concurrent_login_limit($user->id, session_id());
