@@ -166,11 +166,8 @@ $THEME->layouts = [
 $ccnSheetsReset = [];
 $ccnSheetsTheme = [];
 
-if($ccnMdlVersion !== '400') {
+if((int)$ccnMdlVersion < 400) {
   $ccnSheetsTheme[] = 'bootstrap.min';
-}
-if($ccnMdlVersion == '400') {
-  $ccnSheetsTheme[] = 'bootstrap-edumy';
 }
 $ccnSheetsTheme[] = 'jquery-ui.min';
 $ccnSheetsTheme[] = 'font-awesome.min';
@@ -179,6 +176,7 @@ $ccnSheetsTheme[] = 'line-awesome.min';
 $ccnSheetsTheme[] = 'nouislider.min';
 $ccnSheetsTheme[] = 'menu';
 $ccnSheetsTheme[] = 'ace-responsive-menu';
+$ccnSheetsTheme[] = 'megadropdown';
 $ccnSheetsTheme[] = 'bootstrap-select.min';
 $ccnSheetsTheme[] = 'simplebar.min';
 $ccnSheetsTheme[] = 'progressbar';
@@ -219,21 +217,14 @@ if($ccnMdlVersion == '311') {
   $ccnSheetsReset[] = 'cocoon.mdl.reset.311';
   $ccnSheetsAppend[] = 'cocoon.mdl.311';
 }
-$ccnMdlVersions = [
-  '37',
-  '38',
-  '39',
-  '310',
-  '311'
-];
 
-if(in_array($ccnMdlVersion, $ccnMdlVersions)) {
-  $ccnSheetsAppend[] = 'bootstrap.min';
-}
-if($ccnMdlVersion == '400') {
+if((int)$ccnMdlVersion >= 400) {
   $ccnSheetsReset[] = 'cocoon.mdl.reset.400';
   $ccnSheetsAppend[] = 'cocoon.mdl.400';
   $ccnSheetsAppend[] = 'bootstrap-edumy';
+}
+if((int)$ccnMdlVersion >= 401) {
+  $ccnSheetsReset[] = 'cocoon.mdl.reset.401';
 }
 
 if(!empty($THEME->settings->headertype) && $THEME->settings->headertype == 2 ){

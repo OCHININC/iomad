@@ -287,3 +287,6 @@ header.header-nav.menu_style_home_one .ace-responsive-menu li ul.sub-menu li ul.
   border-top-left-radius: 4px;
   border-top-right-radius: 4px;
 }
+.ccn_context_frontend .page-context-header {
+  padding-top: 30px;
+}

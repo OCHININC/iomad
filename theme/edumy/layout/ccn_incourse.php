@@ -20,7 +20,7 @@ if ($incourse_layout_dashboard == 1) {
   if((int)$ccnMdlVersion >= 400) {
     echo $OUTPUT->render_from_template('theme_edumy/ccn_mdl_400/ccn_focus', $templatecontext);
   } else {
-    echo $OUTPUT->render_from_template('theme_boost/ccn_focus', $templatecontext);
+    echo $OUTPUT->render_from_template('theme_edumy/ccn_focus', $templatecontext);
   }
 } else {
   array_push($extraclasses, "ccn_context_frontend");
