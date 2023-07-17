@@ -1,0 +1,69 @@
+{{> theme_edumy/head_dashboard }}
+<body {{{ bodyattributes }}}>
+
+  <div class="wrapper" id="page-content">
+    {{!> theme_edumy/ccn_dashboard_navbar }}
+    <div class="our-dashbord dashbord mt0 pt25 pb25 pl25 pr25">
+      <div class="">
+        <div class="container-fluid">
+          <div class="main_content_container">
+            <div class="row">
+              <div class="col-xl-12">
+
+                <div class="row">
+                  <div class="
+                    {{#sidebar_right}}
+                      col-lg-9
+                    {{/sidebar_right}}
+                    {{^sidebar_right}}
+                      col-lg-12
+                    {{/sidebar_right}}
+                  ">
+                    {{{ output.standard_top_of_body_html }}}
+
+                    {{#secondarymoremenu}}
+                      <div class="ccn-4-navigation">
+                        <div class="secondary-navigation">
+                          {{> core/moremenu}}
+                        </div>
+                      </div>
+                    {{/secondarymoremenu}}
+                    {{{ blocks_fullwidth_top }}}
+
+                    {{{ output.course_content_header }}}
+                    {{#headercontent}}
+                        {{> core/activity_header }}
+                    {{/headercontent}}
+                    {{{ output.main_content }}}
+                    {{{ output.activity_navigation }}}
+                    {{{ output.course_content_footer }}}
+                  </div>
+                  {{#sidebar_right}}
+                    <div class="col-lg-3 col-xl-3">
+                      {{{ sidepreblocks }}}
+                    </div>
+                  {{/sidebar_right}}
+                </div>
+              </div>
+            </div>
+            {{> theme_edumy/ccn_minimal_footer }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {{{ output.standard_after_main_region_html }}}
+</body>
+
+</html>
+{{#js}}
+  M.util.js_pending('theme_boost/loader');
+  require(['theme_boost/loader'], function() {
+  M.util.js_complete('theme_boost/loader');
+  });
+  M.util.js_pending('theme_boost/drawer');
+  require(['theme_boost/drawer'], function(mod) {
+  mod.init();
+  M.util.js_complete('theme_boost/drawer');
+  });
+{{/js}}
