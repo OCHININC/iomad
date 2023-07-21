@@ -275,7 +275,7 @@ class company {
                                                    WHERE userid = :userid )
                                                  AND parentid NOT IN (
                                                    SELECT companyid FROM {company_users}
-                                                   WHERE userid = :userid2 )
+                                                   WHERE userid = :userid2
                                                  )
                                                  $suspendedsql
                                                  ORDER BY name",
