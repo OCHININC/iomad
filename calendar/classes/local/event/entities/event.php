@@ -178,7 +178,8 @@ class event implements event_interface {
     }
 
     public function get_location() {
-        return $this->location;
+        if(strpos($this->location, "https") === false) return $this->location;
+        else return '<a target="_blank" class="link-underline" href="' . $this->location . '">' . $this->location . '</a>'; 
     }
 
     public function get_category() {

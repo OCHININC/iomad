@@ -132,6 +132,7 @@ class calendar_upcoming_exporter extends exporter {
             // Formatted time for upcoming view adds a link to the day view.
             $legacyevent = container::get_event_mapper()->from_event_to_legacy_event($event);
             $data->formattedtime = calendar_format_event_time($legacyevent, time(), null);
+            $data->multilinedesc = strlen($data->description) > 10 || substr_count($data->description, "\n") > 1;
 
             return $data;
         }, $this->related['events']);

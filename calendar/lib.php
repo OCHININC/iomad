@@ -2533,6 +2533,8 @@ function calendar_format_event_time($event, $now, $linkparams = null, $usecommon
         }
     } else { // There is no time duration.
         $time = calendar_time_representation($event->timestart);
+        if($time == "12:00 AM") $time = get_string('allday', 'calendar');
+
         // Set printable representation.
         if (!$showtime) {
             $day = calendar_day_representation($event->timestart, $now, $usecommonwords);
@@ -2893,9 +2895,17 @@ function calendar_add_subscription($sub) {
 function calendar_add_icalendar_event($event, $unused, $subscriptionid, $timezone='UTC') {
     global $DB;
 
+    $alldayevent = false;
+
     // Probably an unsupported X-MICROSOFT-CDO-BUSYSTATUS event.
     if (empty($event->properties['SUMMARY'])) {
         return 0;
+    }
+
+    // Skip unconfirmed events
+    if(isset($event->properties['STATUS'][0]) && $event->properties['STATUS'][0]->value != "CONFIRMED" ) {
+        error_log("Skipping unconfirmed event: " . $event->properties['SUMMARY'][0]->value . "\n", 3, '/var/www/html/info.log');
+        return CALENDAR_IMPORT_EVENT_SKIPPED;
     }
 
     $name = $event->properties['SUMMARY'][0]->value;
@@ -2922,6 +2932,18 @@ function calendar_add_icalendar_event($event, $unused, $subscriptionid, $timezon
         return 0;
     }
 
+    if(isset($event->properties['X-MICROSOFT-CDO-ALLDAYEVENT'][0]) & $event->properties['X-MICROSOFT-CDO-ALLDAYEVENT'][0]->value == "TRUE") {
+        $alldayevent = true;
+        if(!empty($event->properties['DTEND'][0]->value)) {
+            $startdate = $event->properties['DTSTART'][0]->value;
+            $enddate = $event->properties['DTEND'][0]->value;
+            $datediff = (new DateTime($startdate))->diff(new DateTime($enddate))->days;
+            if($datediff > 1) { 
+                $multidayevent = true;
+            }
+        }
+    }
+
     if (isset($event->properties['DTSTART'][0]->parameters['TZID'])) {
         $tz = $event->properties['DTSTART'][0]->parameters['TZID'];
     } else {
@@ -2942,20 +2964,25 @@ function calendar_add_icalendar_event($event, $unused, $subscriptionid, $timezon
     }
 
     // Check to see if it should be treated as an all day event.
-    if ($eventrecord->timeduration == DAYSECS) {
+    if ($eventrecord->timeduration == DAYSECS || $alldayevent) {
         // Check to see if the event started at Midnight on the imported calendar.
         date_default_timezone_set($timezone);
         if (date('H:i:s', $eventrecord->timestart) === "00:00:00") {
             // This event should be an all day event. This is not correct, we don't do anything differently for all day events.
             // See MDL-56227.
-            $eventrecord->timeduration = 0;
+            if($multidayevent) {
+                $eventrecord->timeduration -= 1;
+            }
+            else {
+                $eventrecord->timeduration = 0;
+            }
         }
         \core_date::set_default_server_timezone();
     }
 
     $eventrecord->location = empty($event->properties['LOCATION'][0]->value) ? '' :
             trim(str_replace('\\', '', $event->properties['LOCATION'][0]->value));
-    $eventrecord->uuid = $event->properties['UID'][0]->value;
+    $eventrecord->uuid = $event->properties['UID'][0]->value . $event->properties['DTSTART'][0]->value;
     $eventrecord->timemodified = time();
 
     // Add the iCal subscription details if required.
@@ -3093,7 +3120,7 @@ function calendar_import_events_from_ical(iCalendar $ical, int $subscriptionid =
     }
 
     // Start with a safe default timezone.
-    $timezone = 'UTC';
+    $timezone = 'Pacific Standard Time';
 
     // Grab the timezone from the iCalendar file to be used later.
     if (isset($ical->properties['X-WR-TIMEZONE'][0]->value)) {
@@ -3110,8 +3137,11 @@ function calendar_import_events_from_ical(iCalendar $ical, int $subscriptionid =
     }
 
     $icaluuids = [];
-    foreach ($ical->components['VEVENT'] as $event) {
-        $icaluuids[] = $event->properties['UID'][0]->value;
+
+    $filteredEvents = filter_events($ical->components['VEVENT']);
+
+    foreach ($filteredEvents as $event) {
+        $icaluuids[] = $event->properties['UID'][0]->value . $event->properties['DTSTART'][0]->value;
         $res = calendar_add_icalendar_event($event, null, $subscriptionid, $timezone);
         switch ($res) {
             case CALENDAR_IMPORT_EVENT_UPDATED:
@@ -3139,7 +3169,7 @@ function calendar_import_events_from_ical(iCalendar $ical, int $subscriptionid =
 
         $icaleventscount = count($icaluuids);
         $tobedeleted = [];
-        if (count($eventsuuids) > $icaleventscount) {
+        if (count($eventsuuids) <> $icaleventscount) {
             foreach ($eventsuuids as $eventid => $eventuuid) {
                 if (!in_array($eventuuid, $icaluuids)) {
                     $tobedeleted[] = $eventid;
@@ -3162,6 +3192,31 @@ function calendar_import_events_from_ical(iCalendar $ical, int $subscriptionid =
     ];
 
     return $result;
+}
+
+/**
+* Filter exceptions from recurring events that occur the same datetime as the series start
+* @param array $events An array of RFC-2445 iCalendar events
+* @return array A list of filtered events.
+*/
+function filter_events($events) {
+    return array_filter($events, function($event) use($events) {
+        // Check if event is an exception to recurring event
+        if(!empty($event->properties['RECURRENCE-ID'][0]->value)) {
+
+            // Find if there is a source event with same date and time
+            $sourceevent = array_filter($events, function($n) use($event) {
+                if($n->properties['UID'][0]->value == $event->properties['UID'][0]->value 
+                    && $n->properties['DTSTART'][0]->value == $event->properties['DTSTART'][0]->value) return true;
+            });
+
+            // If there is a source event with the same starttime skip this event
+            if(count($sourceevent)) {
+                return false;
+            }
+        }
+        return true;
+    });
 }
 
 /**
