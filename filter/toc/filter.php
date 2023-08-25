@@ -151,7 +151,7 @@ class filter_toc extends moodle_text_filter {
 			  }
 		  }
 	  	}
-		$highestheading = min(array_filter($headingsused));
+		$highestheading = count(array_filter($headingsused)) > 0 ? min(array_filter($headingsused)) : 1;
 		// Now build the headings list
 	    foreach ($instances as $heading_instance) {
 		  if (!$this->is_within_non_toc_div($heading_instance)) {
