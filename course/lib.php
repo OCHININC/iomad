@@ -2211,9 +2211,9 @@ function create_course($data, $editoroptions = NULL) {
 
     // Check if the idnumber already exists.
     if (!empty($data->idnumber)) {
-        if ($DB->record_exists('course', array('idnumber' => $data->idnumber))) {
-            throw new moodle_exception('courseidnumbertaken', '', '', $data->idnumber);
-        }
+        //if ($DB->record_exists('course', array('idnumber' => $data->idnumber))) {
+        //    throw new moodle_exception('courseidnumbertaken', '', '', $data->idnumber);
+        //}
     }
 
     if (empty($CFG->enablecourserelativedates)) {
@@ -2387,9 +2387,9 @@ function update_course($data, $editoroptions = NULL) {
 
     // Check we don't have a duplicate idnumber.
     if (!empty($data->idnumber) && $oldcourse->idnumber != $data->idnumber) {
-        if ($DB->record_exists_sql('SELECT id from {course} WHERE idnumber = ? AND id <> ?', array($data->idnumber, $data->id))) {
-            throw new moodle_exception('courseidnumbertaken', '', '', $data->idnumber);
-        }
+        //if ($DB->record_exists_sql('SELECT id from {course} WHERE idnumber = ? AND id <> ?', array($data->idnumber, $data->id))) {
+        //    throw new moodle_exception('courseidnumbertaken', '', '', $data->idnumber);
+        //}
     }
 
     if ($errorcode = course_validate_dates((array)$data)) {
