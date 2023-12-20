@@ -22,3 +22,6 @@
 [submodule "local/analytics"]
 	path = local/analytics
 	url = https://github.com/mikeaveli007/moodle-local_analytics.git
+[submodule "mod/pulse"]
+	path = mod/pulse
+	url = https://github.com/bdecentgmbh/moodle-mod_pulse.git
