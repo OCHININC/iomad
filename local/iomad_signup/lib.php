@@ -133,3 +133,45 @@ function local_iomad_signup_user_created($user) {
 
     return true;
 }
+
+function local_iomad_user_added_to_cohort($userid, $cohortid) {
+    global $CFG, $DB;
+
+    $user = $DB->get_record('user', array('id' => $userid), '*', MUST_EXIST);
+
+    if (!$company = company::by_userid($user->id, true)) {
+        if ($cohort = $DB->get_record('cohort', ['id' => $cohortid])) {
+
+                $sa_number = '';
+                if($cohort->name == 'ochin-crowd-staff-all') {
+                    $sa_number = 'SA848';
+                }
+                else {
+                    $sa_number = strtoupper(str_replace('ochin-crowd-', '', $cohort->name));
+                }
+
+                if($company_record = $DB->get_record('company', ['code' => $sa_number])) {
+                    $company = new company($company_record->id);
+
+                    // Get the full user information for department matching.
+                    profile_load_data($user);
+
+                    // Do we have a company departmet profile field?
+                    $autodepartmentid = $company->get_auto_department($user);
+
+                    // assign the user to the company.
+                    $company->assign_user_to_company($user->id, $autodepartmentid);
+
+                    // Deal with company defaults
+                    $defaults = $company->get_user_defaults();
+                    foreach ($defaults as $index => $value) {
+                        $user->$index = $value;
+                    }
+
+                    $DB->update_record('user', $user);
+                    profile_save_data($user);
+                }
+            }
+        }
+    return true;
+}

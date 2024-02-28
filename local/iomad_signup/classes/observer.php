@@ -40,4 +40,13 @@ class local_iomad_signup_observer {
         return true;
     }
 
+    public static function cohort_member_added(\core\event\cohort_member_added $event) {
+        $cohortid = $event->objectid;
+        $userid = $event->relateduserid;
+        
+        local_iomad_user_added_to_cohort($userid, $cohortid);
+        
+        return true;
+    }
+
 }

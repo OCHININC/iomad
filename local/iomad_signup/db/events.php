@@ -31,4 +31,10 @@ $observers = array(
         'callback'    => 'local_iomad_signup_observer::user_created',
         'internal'    => false,
     ),
+
+    array(
+        'eventname' => '\core\event\cohort_member_added',
+        'callback' => 'local_iomad_signup_observer::cohort_member_added',
+        'internal' => false
+    ),
 );
