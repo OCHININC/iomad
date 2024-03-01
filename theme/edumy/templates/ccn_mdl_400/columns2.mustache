@@ -94,22 +94,23 @@
                 {{/participant_user_profile}}
                 {{/display_course_content}}
                 {{/is_course}}
+                </div>
+                {{#has_blocks_below_content}}
+                  {{{ blocks_below_content }}}
+                {{/has_blocks_below_content}}
+                </div>
+                </div>
               </div>
-              {{#has_blocks_below_content}}
-                {{{ blocks_below_content }}}
-              {{/has_blocks_below_content}}
+              {{#sidebar_right}}
+                <div class="col-lg-4 col-xl-3">
+                  <div class="ccn-sidebar-region" aria-label="{{#str}}blocks{{/str}}">
+                    {{{ sidepreblocks }}}
+                  </div>
+                </div>
+              {{/sidebar_right}}
             </div>
           </div>
-          {{#sidebar_right}}
-            <div class="col-lg-4 col-xl-3">
-              <div class="ccn-sidebar-region" aria-label="{{#str}}blocks{{/str}}">
-                {{{ sidepreblocks }}}
-              </div>
-            </div>
-          {{/sidebar_right}}
         </div>
-      </div>
-    </div>
     {{{ blocks_fullwidth_bottom }}}
   </div>
   </div>

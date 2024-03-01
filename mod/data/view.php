@@ -90,7 +90,8 @@ if (!isset($SESSION->dataprefs[$data->id])) {
 if (!is_null(optional_param('resetadv', null, PARAM_RAW))) {
     $SESSION->dataprefs[$data->id]['search_array'] = array();
     // we need the redirect to cleanup the form state properly
-    redirect("view.php?id=$cm->id&amp;mode=$mode&amp;search=&amp;advanced=1");
+    $redirect_url = new moodle_url('/mod/data/view.php', ['id' => $cm->id, 'mode' => '', 'search' => '', 'advanced' => 1]);
+    redirect($redirect_url);
 }
 
 $advanced = optional_param('advanced', -1, PARAM_INT);
