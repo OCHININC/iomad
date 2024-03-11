@@ -25,3 +25,6 @@
 [submodule "mod/pulse"]
 	path = mod/pulse
 	url = https://github.com/bdecentgmbh/moodle-mod_pulse.git
+[submodule "enrol/autoenrol"]
+	path = enrol/autoenrol
+	url = https://github.com/bobopinna/moodle-enrol_autoenrol
