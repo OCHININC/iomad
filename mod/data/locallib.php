@@ -1181,12 +1181,19 @@ function data_search_entries($data, $cm, $context, $mode, $currentgroup, $search
         }
 
         if ($search) {
-            $searchselect = " AND (".$DB->sql_like('c.content', ':search1', false)."
-                              OR ".$DB->sql_like('u.firstname', ':search2', false)."
-                              OR ".$DB->sql_like('u.lastname', ':search3', false)." ) ";
-            $params['search1'] = "%$search%";
-            $params['search2'] = "%$search%";
-            $params['search3'] = "%$search%";
+            if($data->id == 1) {
+                $searchselect = " AND ".$DB->sql_like('c.content', ':search1', false)." 
+                    AND c.fieldid = 1";
+                $params['search1'] = "%$search%";
+            }
+            else {
+                $searchselect = " AND (".$DB->sql_like('c.content', ':search1', false)."
+                    OR ".$DB->sql_like('u.firstname', ':search2', false)."
+                    OR ".$DB->sql_like('u.lastname', ':search3', false)." ) ";
+                $params['search1'] = "%$search%";
+                $params['search2'] = "%$search%";
+                $params['search3'] = "%$search%";
+            }
         } else {
             $searchselect = ' ';
         }
@@ -1221,12 +1228,19 @@ function data_search_entries($data, $cm, $context, $mode, $currentgroup, $search
         }
 
         if ($search) {
-            $searchselect = " AND (".$DB->sql_like('c.content', ':search1', false)." OR
-                ".$DB->sql_like('u.firstname', ':search2', false)." OR
-                ".$DB->sql_like('u.lastname', ':search3', false)." ) ";
-            $params['search1'] = "%$search%";
-            $params['search2'] = "%$search%";
-            $params['search3'] = "%$search%";
+            if($data->id == 1) {
+                $searchselect = " AND ".$DB->sql_like('c.content', ':search1', false)." 
+                    AND c.fieldid = 1";
+                $params['search1'] = "%$search%";
+            }
+            else {
+                $searchselect = " AND (".$DB->sql_like('c.content', ':search1', false)." OR
+                    ".$DB->sql_like('u.firstname', ':search2', false)." OR
+                    ".$DB->sql_like('u.lastname', ':search3', false)." ) ";
+                $params['search1'] = "%$search%";
+                $params['search2'] = "%$search%";
+                $params['search3'] = "%$search%";
+            }
         } else {
             $searchselect = ' ';
         }
