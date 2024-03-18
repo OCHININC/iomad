@@ -36,31 +36,32 @@ $publish = optional_param('publish', 0, PARAM_INTEGER);
 $download = optional_param('download', 0, PARAM_CLEAN);
 $exportcalendar = optional_param('exportcalendar', null, PARAM_CLEAN);
 $userid = optional_param('userid', 0, PARAM_INTEGER);
-$usergrade = optional_param('usergrade', 0, PARAM_INTEGER);
+$usergrades = optional_param_array('usergrades', 0, PARAM_INTEGER);
+$usergradeusers = optional_param_array('usergradeusers', 0, PARAM_INTEGER);
 $current = optional_param('current', 0, PARAM_INTEGER);
 $chosen = optional_param('chosenevent', 0, PARAM_INTEGER);
 $action = optional_param('action', null, PARAM_ALPHA);
 $booking = optional_param('booking', null, PARAM_ALPHA);
 
 if (! $cm = get_coursemodule_from_id('trainingevent', $id)) {
-    print_error('invalidcoursemodule');
+    throw new moodle_exception('invalidcoursemodule');
 }
 
 if (! $course = $DB->get_record("course", array("id" => $cm->course))) {
-    print_error('coursemisconf');
+    throw new moodle_exception('coursemisconf');
 }
 
 require_course_login($course, false, $cm);
 
 // Get the database entry.
 if (!$event = $DB->get_record('trainingevent', array('id' => $cm->instance))) {
-    print_error('noinstance');
+    throw new moodle_exception('noinstance');
 } else {
     if (!$location = $DB->get_record('classroom', array('id' => $event->classroomid))) {
         if (!empty($download)) {
             die;
         }
-        print_error('location not defined');
+        throw new moodle_exception('location not defined');
     } else {
 
         // Page stuff.
@@ -68,9 +69,7 @@ if (!$event = $DB->get_record('trainingevent', array('id' => $cm->instance))) {
         $context = context_course::instance($event->course);
         require_login($event->course); // Adds to $PAGE, creates $OUTPUT.
         $PAGE->set_url($url);
-        $PAGE->set_pagelayout('standard');
         $PAGE->set_title($event->name);
-        $PAGE->set_heading($SITE->fullname);
         $PAGE->set_context(context_module::instance($id));
 
         // Get the associated department id.
@@ -218,7 +217,7 @@ if (!$event = $DB->get_record('trainingevent', array('id' => $cm->instance))) {
                         $res = $DB->insert_record('trainingevent_users', array('trainingeventid' => $event->id, 'userid' => $USER->id));
                     }
                     if (empty($res)) {
-                        print_error('error creating attendance record');
+                        throw new moodle_exception('error creating attendance record');
                     } else {
                         $course = $DB->get_record('course', array('id' => $event->course));
                         $location->time = date($CFG->iomad_date_format . ' \a\t H:i', $event->startdatetime);
@@ -298,7 +297,7 @@ if (!$event = $DB->get_record('trainingevent', array('id' => $cm->instance))) {
                 if ($attendingrecord = $DB->get_record('trainingevent_users', array('trainingeventid' => $event->id,
                                                                                     'userid' => $USER->id))) {
                     if (!$DB->delete_records('trainingevent_users', array('id' => $attendingrecord->id))) {
-                        print_error('error removing attendance record');
+                        throw new moodle_exception('error removing attendance record');
                     } else {
                         $course = $DB->get_record('course', array('id' => $event->course));
                         $location->time = date($CFG->iomad_date_format . ' \a\t H:i', $event->startdatetime);
@@ -373,7 +372,7 @@ if (!$event = $DB->get_record('trainingevent', array('id' => $cm->instance))) {
                                                                                 'tm_ok' => 0,
                                                                                 'manager_ok' => 0,
                                                                                 'companyid' => $company->id))) {
-                        print_error('error creating attendance record');
+                        throw new moodle_exception('error creating attendance record');
                     } else {
                         // theoretically should be a transaction with requesting approval but it's pretty easy to fix this glitch if it happens
                         $DB->delete_records('trainingevent_users', array('trainingeventid' => $event->id, 'userid' => $USER->id, 'waitlisted' => 1));
@@ -471,7 +470,7 @@ if (!$event = $DB->get_record('trainingevent', array('id' => $cm->instance))) {
         if (!empty($chosen) && $chosen != $event->id) {
             // We are moving a user to another event  check there is space.
             if (!$chosenevent = $DB->get_record('trainingevent', array('id' => $chosen))) {
-                print_error('chosen event is invalid');
+                throw new moodle_exception('chosen event is invalid');
             } else {
                 // Get the CMID.
                 $chosencmidinfo = $DB->get_record_sql("SELECT * FROM {course_modules}
@@ -639,7 +638,7 @@ if (!$event = $DB->get_record('trainingevent', array('id' => $cm->instance))) {
                                                                                         'tm_ok' => 0,
                                                                                         'manager_ok' => 1,
                                                                                         'companyid' => $company->id))) {
-                                print_error('error creating attendance record');
+                                throw new moodle_exception('error creating attendance record');
                             } else {
                                 $course = $DB->get_record('course', array('id' => $event->course));
                                 $location->time = date($CFG->iomad_date_format . ' \a\t H:i', $chosenevent->startdatetime);
@@ -940,7 +939,7 @@ if (!$event = $DB->get_record('trainingevent', array('id' => $cm->instance))) {
                                                                                     'tm_ok' => 0,
                                                                                     'manager_ok' => 1,
                                                                                     'companyid' => $company->id))) {
-                            print_error('error creating attendance record');
+                            throw new moodle_exception('error creating attendance record');
                         } else {
                             $course = $DB->get_record('course', array('id' => $event->course));
                             $location->time = date($CFG->iomad_date_format . ' \a\t H:i', $event->startdatetime);
@@ -1011,19 +1010,21 @@ if (!$event = $DB->get_record('trainingevent', array('id' => $cm->instance))) {
                 $DB->delete_records('trainingevent_users', array('trainingeventid' => $event->id, 'waitlisted' => 0));
             }
         }
-        if ($action == 'grade' && !empty($userid)) {
-            // Grade the user.
-            $gradegrade = (object) [];
-            $gradegrade->userid = $userid;
-            $gradegrade->rawgrade = $usergrade;
-            $gradegrade->finalgrade = $usergrade;
-            $gradegrade->usermodified = $USER->id;
-            $gradegrade->timemodified = time();
-            $gradeparams['gradetype'] = GRADE_TYPE_VALUE;
-            $gradeparams['grademax']  = 100;
-            $gradeparams['grademin']  = 0;
-            $gradeparams['reset'] = false;
-            grade_update('mod/trainingevent', $event->course, 'mod', 'trainingevent', $event->id, 0, $gradegrade, $gradeparams);
+        if ($action == 'grade' && !empty($usergradeusers)) {
+            foreach ($usergradeusers as $gid => $userid) {
+                // Grade the user.
+                $gradegrade = (object) [];
+                $gradegrade->userid = $userid;
+                $gradegrade->rawgrade = $usergrades[$gid];
+                $gradegrade->finalgrade = $usergrades[$gid];
+                $gradegrade->usermodified = $USER->id;
+                $gradegrade->timemodified = time();
+                $gradeparams['gradetype'] = GRADE_TYPE_VALUE;
+                $gradeparams['grademax']  = 100;
+                $gradeparams['grademin']  = 0;
+                $gradeparams['reset'] = false;
+                grade_update('mod/trainingevent', $event->course, 'mod', 'trainingevent', $event->id, 0, $gradegrade, $gradeparams);
+            }
         }
 
         if ($attendance = (array) $DB->get_records('trainingevent_users', array('trainingeventid' => $event->id, 'waitlisted' => 0), null, 'userid')) {
@@ -1045,7 +1046,7 @@ if (!$event = $DB->get_record('trainingevent', array('id' => $cm->instance))) {
 
             // Check the userid is valid.
             if (!company::check_valid_user($company->id, $USER->id, $departmentid)) {
-                print_error('invaliduserdepartment', 'block_iomad_company_management');
+                throw new moodle_exception('invaliduserdepartment', 'block_iomad_company_management');
             }
 
             echo "<h2>".get_string('sendingemails', 'trainingevent')."</h2>";
@@ -1155,7 +1156,7 @@ if (!$event = $DB->get_record('trainingevent', array('id' => $cm->instance))) {
 
             // Check the userid is valid.
             if (!company::check_valid_user($company->id, $USER->id, $departmentid)) {
-                print_error('invaliduserdepartment', 'block_iomad_company_management');
+                throw new moodle_exception('invaliduserdepartment', 'block_iomad_company_management');
             }
 
             echo $eventtable;
@@ -1376,17 +1377,9 @@ if (!$event = $DB->get_record('trainingevent', array('id' => $cm->instance))) {
 
             if (!$download) {
                 echo "<h3>".get_string('attendance', 'local_report_attendance')."</h3>";
-                echo html_writer::start_tag('div', array('id' => 'trainingeventattendancetable'));
             }
             $table->out($CFG->iomad_max_list_users, true);
             if (!$download) {
-                echo html_writer::end_tag('div');
-            }
-            if (!$download) {
-
-                if (has_capability('mod/trainingevent:grade', $context)) {
-                    echo '<br><input type="submit" value="' . get_string('grade', 'grades') . '" />';
-                }
                 echo $OUTPUT->footer();
             }
         }

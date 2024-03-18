@@ -15,13 +15,15 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * @package   block_iomad_onlineusers
- * @copyright 2021 Derick Turner
- * @author    Derick Turner
- * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * Version details
+ *
+ * @package    block_iomad_onlineusers
+ * @copyright  1999 onwards Martin Dougiamas (http://dougiamas.com)
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-$plugin->release  = '4.1.9 (Build: 20240212)'; // Human-friendly version name
-$plugin->version = 2016083100;
-$plugin->requires  = 2019052000;        // Requires this Moodle version
+defined('MOODLE_INTERNAL') || die();
+
+$plugin->version   = 2022112800;        // The current plugin version (Date: YYYYMMDDXX).
+$plugin->requires  = 2022111800;        // Requires this Moodle version.
 $plugin->component = 'block_iomad_onlineusers'; // Full name of the plugin (used for diagnostics)
