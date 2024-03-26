@@ -28,3 +28,9 @@
 [submodule "enrol/autoenrol"]
 	path = enrol/autoenrol
 	url = https://github.com/bobopinna/moodle-enrol_autoenrol
+[submodule "auth/oidc"]
+	path = auth/oidc
+	url = https://github.com/microsoft/moodle-auth_oidc.git
+[submodule "local/o365"]
+	path = local/o365
+	url = https://github.com/microsoft/moodle-local_o365.git
