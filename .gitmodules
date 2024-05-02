@@ -28,3 +28,6 @@
 [submodule "enrol/autoenrol"]
 	path = enrol/autoenrol
 	url = https://github.com/bobopinna/moodle-enrol_autoenrol
+[submodule "admin/tool/uploadactivitycompletions"]
+	path = admin/tool/uploadactivitycompletions
+	url = https://github.com/mikeaveli007/moodle-tool_uploadactivitycompletions.git
