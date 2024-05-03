@@ -34,3 +34,6 @@
 [submodule "block/completion_progress"]
 	path = blocks/completion_progress
 	url = https://github.com/jonof/moodle-block_completion_progress.git
+[submodule "blocks/grade_me"]
+	path = blocks/grade_me
+	url = https://github.com/remotelearner/moodle-block_grade_me.git
