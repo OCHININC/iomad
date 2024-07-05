@@ -142,8 +142,14 @@ $companyid = iomad::get_my_companyid($systemcontext);
 $returnurl = $baseurl;
 
 // Check the department is valid.
-if (!empty($departmentid) && !company::check_valid_department($companyid, $departmentid)) {
-    print_error('invaliddepartment', 'block_iomad_company_admin');
+if (!empty($departmentid)) {
+    if (!company::check_valid_department($companyid, $departmentid)) {
+        throw new moodle_exception('invaliddepartment', 'block_iomad_company_admin');
+    }
+    $deprecord = $DB->get_record('department', ['id' => $departmentid]);
+    $selectedcompanyid = $deprecord->company;
+} else {
+    $selectedcompanyid = $companyid;
 }
 
 // Get the associated department id.
@@ -163,14 +169,14 @@ if ($departmentid == 0) {
 
 if (!(iomad::has_capability('block/iomad_company_admin:editusers', $systemcontext)
     or iomad::has_capability('block/iomad_company_admin:editallusers', $systemcontext))) {
-    print_error('nopermissions', 'error', '', 'edit/delete users');
+    throw new moodle_exception('nopermissions', 'error', '', 'edit/delete users');
 }
 
 // Set up the filter form.
 if (iomad::has_capability('block/iomad_company_admin:company_add', $systemcontext)) {
-    $mform = new iomad_user_filter_form(null, array('companyid' => $companyid, 'useshowall' => true, 'addusertype' => true));
+    $mform = new iomad_user_filter_form(null, array('companyid' => $selectedcompanyid, 'useshowall' => true, 'addusertype' => true));
 } else {
-    $mform = new iomad_user_filter_form(null, array('companyid' => $companyid, 'addusertype' => true));
+    $mform = new iomad_user_filter_form(null, array('companyid' => $selectedcompanyid, 'addusertype' => true));
 }
 $mform->set_data(array('departmentid' => $departmentid, 'usertype' => $usertype));
 $mform->set_data($params);
@@ -269,7 +275,7 @@ if (empty($CFG->loginhttps)) {
 
 if ($confirmuser and confirm_sesskey()) {
     if (!$user = $DB->get_record('user', array('id' => $confirmuser))) {
-        print_error('nousers');
+        throw new moodle_exception('nousers');
     }
 
     $auth = get_auth_plugin($user->auth);
@@ -284,7 +290,7 @@ if ($confirmuser and confirm_sesskey()) {
 
 } else if ($password and confirm_sesskey()) {
     if (!$user = $DB->get_record('user', array('id' => $password))) {
-        print_error('nousers');
+        throw new moodle_exception('nousers');
     }
 
     if ($confirm != md5($password)) {
@@ -304,19 +310,19 @@ if ($confirmuser and confirm_sesskey()) {
 } else if ($delete and confirm_sesskey()) {              // Delete a selected user, after confirmation.
 
     if (!iomad::has_capability('block/iomad_company_admin:editusers', $systemcontext)) {
-        print_error('nopermissions', 'error', '', 'delete a user');
+        throw new moodle_exception('nopermissions', 'error', '', 'delete a user');
     }
 
     if (!$user = $DB->get_record('user', array('id' => $delete))) {
-        print_error('nousers', 'error');
+        throw new moodle_exception('nousers', 'error');
     }
 
     if (!company::check_canedit_user($companyid, $user->id)) {
-        print_error('invaliduserid');
+        throw new moodle_exception('invaliduserid');
     }
 
     if (is_primary_admin($user->id)) {
-        print_error('nopermissions', 'error', '', 'delete the primary admin user');
+        throw new moodle_exception('nopermissions', 'error', '', 'delete the primary admin user');
     }
 
     if ($confirm != md5($delete)) {
@@ -347,18 +353,18 @@ if ($confirmuser and confirm_sesskey()) {
 } else if ($suspend and confirm_sesskey()) {              // Delete a selected user, after confirmation.
 
     if (!iomad::has_capability('block/iomad_company_admin:editusers', $systemcontext)) {
-        print_error('nopermissions', 'error', '', 'suspend a user');
+        throw new moodle_exception('nopermissions', 'error', '', 'suspend a user');
     }
 
     if (!$user = $DB->get_record('user', array('id' => $suspend))) {
-        print_error('nousers', 'error');
+        throw new moodle_exception('nousers', 'error');
     }
 
     if (!company::check_canedit_user($companyid, $user->id)) {
-        print_error('invaliduserid');
+        throw new moodle_exception('invaliduserid');
     }
     if (is_primary_admin($user->id)) {
-        print_error('nopermissions', 'error', '', 'delete the primary admin user');
+        throw new moodle_exception('nopermissions', 'error', '', 'delete the primary admin user');
     }
 
     if ($confirm != md5($suspend)) {
@@ -390,24 +396,24 @@ if ($confirmuser and confirm_sesskey()) {
     // Check if the company has gone over the user quota.
     if (!$company->check_usercount(1)) {
         $maxusers = $company->get('maxusers');
-        print_error('maxuserswarning', 'block_iomad_company_admin', $returnurl, $maxusers);
+        throw new moodle_exception('maxuserswarning', 'block_iomad_company_admin', $returnurl, $maxusers);
     }
 
     // Unsuspends a selected user, after confirmation.
     if (!iomad::has_capability('block/iomad_company_admin:editusers', $systemcontext)) {
-        print_error('nopermissions', 'error', '', 'suspend a user');
+        throw new moodle_exception('nopermissions', 'error', '', 'suspend a user');
     }
 
     if (!$user = $DB->get_record('user', array('id' => $unsuspend))) {
-        print_error('nousers', 'error');
+        throw new moodle_exception('nousers', 'error');
     }
 
     if (!company::check_canedit_user($companyid, $user->id)) {
-        print_error('invaliduserid');
+        throw new moodle_exception('invaliduserid');
     }
 
     if (is_primary_admin($user->id)) {
-        print_error('nopermissions', 'error', '', 'delete the primary admin user');
+        throw new moodle_exception('nopermissions', 'error', '', 'delete the primary admin user');
     }
 
     if ($confirm != md5($unsuspend)) {
@@ -438,17 +444,17 @@ if ($confirmuser and confirm_sesskey()) {
 } else if ($acl and confirm_sesskey()) {
     if (!iomad::has_capability('block/iomad_company_admin:editusers', $systemcontext)) {
         // TODO: this should be under a separate capability.
-        print_error('nopermissions', 'error', '', 'modify the NMET access control list');
+        throw new moodle_exception('nopermissions', 'error', '', 'modify the NMET access control list');
     }
     if (!$user = $DB->get_record('user', array('id' => $acl))) {
-        print_error('nousers', 'error');
+        throw new moodle_exception('nousers', 'error');
     }
     if (!is_mnet_remote_user($user)) {
-        print_error('usermustbemnet', 'error');
+        throw new moodle_exception('usermustbemnet', 'error');
     }
     $accessctrl = strtolower(required_param('accessctrl', PARAM_ALPHA));
     if ($accessctrl != 'allow' and $accessctrl != 'deny') {
-        print_error('invalidaccessparameter', 'error');
+        throw new moodle_exception('invalidaccessparameter', 'error');
     }
     $aclrecord = $DB->get_record('mnet_sso_access_control', array('username' => $user->username, 'mnet_host_id'
                                   => $user->mnethostid));
@@ -585,7 +591,7 @@ if (!empty($showall)) {
 $selectsql = "DISTINCT " . $DB->sql_concat("u.id", $DB->sql_concat("'-'", "c.id")) . " AS cindex, u.*, c.id AS companyid, c.name AS companyname, u.suspended, cu.managertype, cu.educator";
 $fromsql = "{user} u JOIN {company_users} cu ON (u.id = cu.userid) JOIN {department} d ON (cu.departmentid = d.id AND cu.companyid = d.company) JOIN {company} c ON (cu.companyid = c.id AND d.company = c.id)";
 $wheresql = $searchinfo->sqlsearch . " $sqlsearch $companysql $managertypesql";
-$sqlparams = $searchinfo->searchparams + $params + array('companyid' => $companyid);
+$sqlparams = $searchinfo->searchparams + $params + array('companyid' => $selectedcompanyid);
 $countsql = "SELECT COUNT(DISTINCT " . $DB->sql_concat("u.id", $DB->sql_concat("'-'", "c.id")) . ") FROM $fromsql WHERE $wheresql";
 
 // Carry on with the user listing.

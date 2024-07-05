@@ -89,16 +89,23 @@ $PAGE->set_other_editing_capability('local/report_users:updateentries');
 $PAGE->set_heading(get_string('userdetails', 'local_report_users').
           $userinfo->firstname." ".
           $userinfo->lastname. " (".$userinfo->email.")");
+$buttons = "";
 if (iomad::has_capability('local/report_completion:view', $context)) {
     $buttoncaption = get_string('pluginname', 'local_report_completion');
     $buttonlink = new moodle_url($CFG->wwwroot . "/local/report_completion/index.php");
-    $buttons = $OUTPUT->single_button($buttonlink, $buttoncaption, 'get');
-    // Non boost theme edit buttons.
-    if ($PAGE->user_allowed_editing()) {
-        $buttons .= "&nbsp" . $OUTPUT->edit_button($PAGE->url);
-    }
-    $PAGE->set_button($buttons);
+    $buttons .= $OUTPUT->single_button($buttonlink, $buttoncaption, 'get');
 }
+if (iomad::has_capability('block/iomad_company_admin:downloadcertificates', $context)) {
+    $buttoncaption = get_string('downloadcertificates', 'block_iomad_company_admin');
+    $buttonlink = new moodle_url($CFG->wwwroot . "/local/report_completion/index.php", ['certcourses' => '0', 'certusers' => $userid, 'action' => 'downloadcerts', 'sesskey' => sesskey()]);
+    $buttons .= $OUTPUT->single_button($buttonlink, $buttoncaption, 'get');
+}
+// Non boost theme edit buttons.
+if ($PAGE->user_allowed_editing()) {
+    $buttons .= "&nbsp" . $OUTPUT->edit_button($PAGE->url);
+}
+$PAGE->set_button($buttons);
+
 
 // Deal with the adhoc form.
 $data = data_submitted();
@@ -263,7 +270,7 @@ $output = $PAGE->get_renderer('block_iomad_company_admin');
 
 // Check the userid is valid.
 if (!company::check_valid_user($companyid, $userid)) {
-    print_error('invaliduser', 'block_iomad_company_management');
+    throw new moodle_exception('invaliduser', 'block_iomad_company_management');
 }
 
 // Check for user/course delete?
@@ -427,7 +434,14 @@ if ($validonly) {
     $validsql = "";
 }
 
-$wheresql = " lit.userid = :userid AND lit.companyid = :companyid AND lit.courseid IN (" . join(',', array_keys($company->get_menu_courses(true))) .") $validsql";
+if (iomad::has_capability('block/iomad_company_admin:company_add', $context)) {
+    $companysql = "";
+} else {
+    $companysql = " AND lit.companyid IN (SELECT DISTINCT companyid FROM {company_users} WHERE userid = :myuserid AND managertype !=0) ";
+    $sqlparams['myuserid'] = $USER->id;
+}
+
+$wheresql = " lit.userid = :userid $companysql AND lit.courseid IN (" . join(',', array_keys($company->get_menu_courses(true))) .") $validsql";
 
 // Set up the headers for the form.
 $headers = array(get_string('course', 'local_report_completion'),

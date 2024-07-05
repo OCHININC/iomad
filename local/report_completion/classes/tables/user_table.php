@@ -103,7 +103,7 @@ class user_table extends table_sql {
      */
     public function col_company($row) {
         global $DB;
-        $companies = $DB->get_records_sql("SELECT c.name FROM {company} c
+        $companies = $DB->get_records_sql("SELECT DISTINCT c.name FROM {company} c
                                            JOIN {company_users} cu ON (c.id = cu.companyid)
                                            WHERE cu.userid = :userid",
                                            ['userid' => $row->userid]);
@@ -305,7 +305,7 @@ class user_table extends table_sql {
      * @return string HTML content to go inside the td.
      */
     public function col_actions($row) {
-        global $DB, $USER, $params;
+        global $DB, $USER, $params, $companycontext;
 
         // Do nothing if downloading.
         if ($this->is_downloading()) {

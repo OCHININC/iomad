@@ -113,7 +113,7 @@ $company = new company($mycompanyid);
 // Delete any valid courses.
 if (!empty($deleteid)) {
     if (!$course = $DB->get_record('course', array('id' => $deleteid))) {
-        print_error('invalidcourse');
+        throw new moodle_exception('invalidcourse');
     }
     if (confirm_sesskey() && $confirm == md5($deleteid)) {
         $destroy = optional_param('destroy', 0, PARAM_INT);
@@ -186,7 +186,7 @@ if (!empty($deleteid)) {
 // Hide/show courses.
 if(!empty($hideid) && iomad::has_capability('block/iomad_company_admin:managecourses', $systemcontext)) {    
     if (!$course = $DB->get_record('course', array('id' => $hideid))) {
-        print_error('invalidcourse');
+        throw new moodle_exception('invalidcourse');
     }
     if (confirm_sesskey()) {
     	  $record = get_course($hideid);
@@ -196,7 +196,7 @@ if(!empty($hideid) && iomad::has_capability('block/iomad_company_admin:managecou
 }
 if(!empty($showid) && iomad::has_capability('block/iomad_company_admin:managecourses', $systemcontext)) {
     if (!$course = $DB->get_record('course', array('id' => $showid))) {
-        print_error('invalidcourse');
+        throw new moodle_exception('invalidcourse');
     } 
     if (confirm_sesskey()) {
     	  $record = get_course($showid);
@@ -217,8 +217,8 @@ echo $OUTPUT->header();
 $companyids = company::get_companies_select(false);
 if ($caneditall) {
     $companyids = [
-            'none' => get_string('nocompany', 'block_iomad_company_admin'),
-            'all' => get_string('allcourses', 'block_iomad_company_admin')
+            '-1' => get_string('nocompany', 'block_iomad_company_admin'),
+            '-2' => get_string('allcourses', 'block_iomad_company_admin')
     ] + $companyids;
 }
 
@@ -236,7 +236,7 @@ echo html_writer::start_tag('div', array('class' => 'iomadclear'));
 
 $table = new \block_iomad_company_admin\tables\iomad_courses_table('iomad_courses_table');
 
-if ($companyid == 'all') {
+if ($companyid == '-2') {
     $companyid = 0;
 }
 
@@ -245,7 +245,7 @@ $searchsql = "";
 $autoselect = "";
 $autofrom = "";
 if (!empty($companyid)) {
-    if ($companyid == "none") {
+    if ($companyid == "-1") {
         $companysql = " c.id NOT IN (SELECT courseid FROM {company_course}) ";
     } else {
         $companysql = " (c.id IN (
@@ -287,9 +287,14 @@ $wheresql = "$companysql $searchsql";
 $sqlparams = $params;
 
 // Set up the headers for the table.
-$tableheaders = [
-    get_string('company', 'block_iomad_company_admin'),
-    get_string('course'),
+$tableheaders = [];
+$tablecolumns = [];
+if (iomad::has_capability('block/iomad_company_admin:company_view_all', $systemcontext)) {
+    $tableheaders[] = get_string('company', 'block_iomad_company_admin');
+    $tablecolumns[] = 'company';
+}
+$tableheaders = array_merge($tableheaders,
+   [get_string('course'),
     get_string('licensed', 'block_iomad_company_admin') . $OUTPUT->help_icon('licensed', 'block_iomad_company_admin'),
     get_string('validfor', 'block_iomad_company_admin') . $OUTPUT->help_icon('validfor', 'block_iomad_company_admin'),
     get_string('expireafter', 'block_iomad_company_admin') . $OUTPUT->help_icon('expireafter', 'block_iomad_company_admin'),
@@ -297,9 +302,9 @@ $tableheaders = [
     get_string('warnnotstarted', 'block_iomad_company_admin') . $OUTPUT->help_icon('warnnotstarted', 'block_iomad_company_admin'),
     get_string('warncompletion', 'block_iomad_company_admin') . $OUTPUT->help_icon('warncompletion', 'block_iomad_company_admin'),
     get_string('notifyperiod', 'block_iomad_company_admin') . $OUTPUT->help_icon('notifyperiod', 'block_iomad_company_admin'),
-    get_string('hasgrade', 'block_iomad_company_admin') . $OUTPUT->help_icon('hasgrade', 'block_iomad_company_admin')];
-$tablecolumns = ['company',
-                 'coursename',
+    get_string('hasgrade', 'block_iomad_company_admin') . $OUTPUT->help_icon('hasgrade', 'block_iomad_company_admin')]);
+$tablecolumns = array_merge($tablecolumns,
+                ['coursename',
                  'licensed',
                  'validlength',
                  'expireafter',
@@ -307,8 +312,8 @@ $tablecolumns = ['company',
                  'warnnotstarted',
                  'warncompletion',
                  'notifyperiod',
-                 'hasgrade'];
-if (!empty($companyid) && $companyid != "none") {
+                 'hasgrade']);
+if (!empty($companyid) && $companyid != "-1") {
     $tableheaders[] = get_string('autocourses', 'block_iomad_company_admin');
     $tablecolumns[] = 'autoenrol';
 }

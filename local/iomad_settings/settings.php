@@ -41,15 +41,30 @@ if ($hassiteconfig) {
                                                 get_string('iomad_allow_username_help', 'local_iomad_settings'),
                                                 0));
 
-    $settings->add(new admin_setting_configcheckbox('iomad_sync_institution',
-                                                get_string('iomad_sync_institution', 'local_iomad_settings'),
-                                                get_string('iomad_sync_institution_help', 'local_iomad_settings'),
+    $settings->add(new admin_setting_configcheckbox('iomad_show_company_structure',
+                                                get_string('iomad_show_company_structure', 'local_iomad_settings'),
+                                                get_string('iomad_show_company_structure_help', 'local_iomad_settings'),
                                                 1));
 
-    $settings->add(new admin_setting_configcheckbox('iomad_sync_department',
+    $institutionsync = [get_string('no'),
+                        get_string('companyshortname', 'block_iomad_company_admin'),
+                        get_string('companyname', 'block_iomad_company_admin')];
+
+    $settings->add(new admin_setting_configselect('iomad_sync_institution',
+                                                get_string('iomad_sync_institution', 'local_iomad_settings'),
+                                                get_string('iomad_sync_institution_help', 'local_iomad_settings'),
+                                                1,
+                                                $institutionsync));
+
+    $departmentsync = [get_string('no'),
+                      get_string('setfromcompany', 'block_iomad_company_admin'),
+                      get_string('settocompany', 'block_iomad_company_admin')];
+
+    $settings->add(new admin_setting_configselect('iomad_sync_department',
                                                 get_string('iomad_sync_department', 'local_iomad_settings'),
-                                                get_string('iomad_sync_department', 'local_iomad_settings'),
-                                                1));
+                                                get_string('iomad_sync_department_help', 'local_iomad_settings'),
+                                                1,
+                                                $departmentsync));
 
     $settings->add(new admin_setting_configcheckbox('iomad_autoenrol_managers',
                                                 get_string('iomad_autoenrol_managers', 'local_iomad_settings'),
@@ -70,6 +85,16 @@ if ($hassiteconfig) {
                                                 get_string('iomad_showcharts', 'local_iomad_settings'),
                                                 get_string('iomad_showcharts', 'local_iomad_settings'),
                                                 1));
+
+    $settings->add(new admin_setting_configcheckbox('iomad_downloaddetails',
+                                                get_string('iomad_downloaddetails', 'local_iomad_settings'),
+                                                get_string('iomad_downloaddetails_help', 'local_iomad_settings'),
+                                                1));
+
+    $settings->add(new admin_setting_configcheckbox('iomad_useicons',
+                                                get_string('iomad_useicons', 'local_iomad_settings'),
+                                                get_string('iomad_useicons', 'local_iomad_settings'),
+                                                0));
 
     $settings->add(new admin_setting_configtext('iomad_emaildelay',
                                                 get_string('emaildelay', 'local_iomad_settings'),

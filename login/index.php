@@ -65,7 +65,7 @@ if (isloggedin() && !isguestuser() && !empty($SESSION->wantsurl)) {
 
 // Check if the company being passed is valid.
 if (!empty($wantedcompanyid) && !$company = $DB->get_record('company', array('id'=> $wantedcompanyid, 'shortname'=>$wantedcompanyshort))) {
-    print_error(get_string('unknown_company', 'local_iomad_signup'));
+    throw new moodle_exception(get_string('unknown_company', 'local_iomad_signup'));
 } else if (!empty($wantedcompanyid)) {
     // Set the page theme.
     $SESSION->currenteditingcompany = $company->id;
@@ -87,7 +87,8 @@ $errormsg = '';
 $errorcode = 0;
 
 // IOMAD - Set the theme if the server hostname matches one of ours.
-if ($company = $DB->get_record('company', array('hostname' => $_SERVER["SERVER_NAME"]))) {
+if ($DB->get_manager()->table_exists('company') &&
+    $company = $DB->get_record('company', array('hostname' => $_SERVER["SERVER_NAME"]))) {
     $hascompanybyurl = true;
     // set the current editing company to be this.
     $SESSION->currenteditingcompany = $company->id;
@@ -258,7 +259,8 @@ if ($frm and isset($frm->username)) {                             // Login WITH 
         }
 
         // Check if the company in the session is still correct.
-        if (!has_capability('block/iomad_company_admin:company_view_all', context_system::instance()) &&
+        if ($DB->get_manager()->table_exists('company') &&
+            !has_capability('block/iomad_company_admin:company_view_all', context_system::instance()) &&
             !empty($SESSION->currenteditingcompany)) {
             $currenteditingcompany = $SESSION->currenteditingcompany;
             $currentcompany = $SESSION->company;
