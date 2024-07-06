@@ -28,3 +28,18 @@
 [submodule "enrol/autoenrol"]
 	path = enrol/autoenrol
 	url = https://github.com/bobopinna/moodle-enrol_autoenrol
+[submodule "auth/oidc"]
+	path = auth/oidc
+	url = https://github.com/OCHININC/moodle-auth_oidc.git
+[submodule "local/o365"]
+	path = local/o365
+	url = https://github.com/OCHININC/ella-local_o365.git
+[submodule "admin/tool/uploadactivitycompletions"]
+	path = admin/tool/uploadactivitycompletions
+	url = https://github.com/mikeaveli007/moodle-tool_uploadactivitycompletions.git
+[submodule "block/completion_progress"]
+	path = blocks/completion_progress
+	url = https://github.com/jonof/moodle-block_completion_progress.git
+[submodule "blocks/grade_me"]
+	path = blocks/grade_me
+	url = https://github.com/remotelearner/moodle-block_grade_me.git

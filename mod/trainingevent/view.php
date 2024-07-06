@@ -42,6 +42,7 @@ $current = optional_param('current', 0, PARAM_INTEGER);
 $chosen = optional_param('chosenevent', 0, PARAM_INTEGER);
 $action = optional_param('action', null, PARAM_ALPHA);
 $booking = optional_param('booking', null, PARAM_ALPHA);
+$confirm      = optional_param('confirm', '', PARAM_ALPHANUM);
 
 if (! $cm = get_coursemodule_from_id('trainingevent', $id)) {
     throw new moodle_exception('invalidcoursemodule');
@@ -187,9 +188,14 @@ if (!$event = $DB->get_record('trainingevent', array('id' => $cm->instance))) {
         if (!empty($attending)) {
             $companyid = iomad::get_my_companyid(context_system::instance());
             $usercompany = new company($companyid);
+            $course = $DB->get_record('course', array('id' => $event->course));
+            $location->time = date($CFG->iomad_date_format . ' \a\t H:i', $event->startdatetime);
+
+            // Process the request.
             if ('yes' == $attending) {
                 $record = $DB->get_record('trainingevent_users', array('trainingeventid' => $event->id, 'userid' => $USER->id));
 
+                // Is this for the waiting list?
                 if ($waitingoption) {
                     if (!($record && $record->waitlisted)) {
                         if ($record) {
@@ -198,6 +204,13 @@ if (!$event = $DB->get_record('trainingevent', array('id' => $cm->instance))) {
                             $DB->insert_record('trainingevent_users', array('trainingeventid' => $event->id, 'userid' => $USER->id, 'waitlisted'=>1));
                         }
                     }
+
+                    // Send the added to waiting list email.
+                    EmailTemplate::send('user_signed_up_to_waitlist', array('course' => $course,
+                                                                            'user' => $USER,
+                                                                            'classroom' => $location,
+                                                                            'company' => $usercompany,
+                                                                            'event' => $event));
 
                 } else if (!($record && !$record->waitlisted)) {
                     if ($record && $record->waitlisted) {
@@ -211,7 +224,7 @@ if (!$event = $DB->get_record('trainingevent', array('id' => $cm->instance))) {
                                 foreach ($otherevents as $otherevent) {
                                     $DB->delete_records('trainingevent_users', ['trainingeventid' => $otherevent->id, 'userid' => $USER->id, 'waitlisted' => 1]);
                                 }
-                            } 
+                            }
                         }
                     } else {
                         $res = $DB->insert_record('trainingevent_users', array('trainingeventid' => $event->id, 'userid' => $USER->id));
@@ -219,8 +232,6 @@ if (!$event = $DB->get_record('trainingevent', array('id' => $cm->instance))) {
                     if (empty($res)) {
                         throw new moodle_exception('error creating attendance record');
                     } else {
-                        $course = $DB->get_record('course', array('id' => $event->course));
-                        $location->time = date($CFG->iomad_date_format . ' \a\t H:i', $event->startdatetime);
 
                         // Send an email as long as it hasn't already started.
                         if ($event->startdatetime > time()) {
@@ -1006,8 +1017,19 @@ if (!$event = $DB->get_record('trainingevent', array('id' => $cm->instance))) {
             }
         }
         if ($action == 'reset') {
-            if (has_capability('mod/trainingevent:resetattendees', $context)) {
-                $DB->delete_records('trainingevent_users', array('trainingeventid' => $event->id, 'waitlisted' => 0));
+            if ($confirm != md5($action)) {
+                echo $OUTPUT->header();
+                echo $OUTPUT->heading(get_string('resetattending', 'trainingevent'));
+                $optionsyes = ['id' => $id, 'action' => 'reset', 'confirm' => md5($action), 'sesskey' => sesskey()];
+                echo $OUTPUT->confirm(get_string('resetattendingfull', 'trainingevent'),
+                                                  new moodle_url('/mod/trainingevent/view.php', $optionsyes),
+                                                                 new moodle_url('/mod/trainingevent/view.php', ['id' => $id]));
+                echo $OUTPUT->footer();
+                die;
+            } else {
+                if (has_capability('mod/trainingevent:resetattendees', $context)) {
+                    $DB->delete_records('trainingevent_users', array('trainingeventid' => $event->id, 'waitlisted' => 0));
+                }
             }
         }
         if ($action == 'grade' && !empty($usergradeusers)) {
