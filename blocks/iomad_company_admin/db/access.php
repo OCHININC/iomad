@@ -737,6 +737,15 @@ $capabilities = array(
             'user' => CAP_ALLOW
         ),
     ),
+    
+    'block/iomad_company_admin:editpubliclocation' => array(
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_BLOCK,
+        'archetypes' => array(
+            'clientadministrator' => CAP_ALLOW
+        ),
+    ),
+    
 
 );
 
