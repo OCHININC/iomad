@@ -43,3 +43,9 @@
 [submodule "blocks/grade_me"]
 	path = blocks/grade_me
 	url = https://github.com/remotelearner/moodle-block_grade_me.git
+[submodule "mod/booking"]
+	path = mod/booking
+	url = https://github.com/Wunderbyte-GmbH/moodle-mod_booking.git
+[submodule "local/wunderbyte_table"]
+	path = local/wunderbyte_table
+	url = https://github.com/Wunderbyte-GmbH/moodle-local_wunderbyte_table.git
