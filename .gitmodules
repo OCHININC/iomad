@@ -49,3 +49,6 @@
 [submodule "local/wunderbyte_table"]
 	path = local/wunderbyte_table
 	url = https://github.com/Wunderbyte-GmbH/moodle-local_wunderbyte_table.git
+[submodule "blocks/booking"]
+	path = blocks/booking
+	url = https://github.com/Wunderbyte-GmbH/moodle-block_booking
