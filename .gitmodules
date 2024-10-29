@@ -52,3 +52,6 @@
 [submodule "blocks/booking"]
 	path = blocks/booking
 	url = https://github.com/Wunderbyte-GmbH/moodle-block_booking
+[submodule "mod/subcourse"]
+	path = mod/subcourse
+	url = https://github.com/catalyst/moodle-mod_subcourse.git
