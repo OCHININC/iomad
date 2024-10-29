@@ -49,3 +49,6 @@
 [submodule "local/wunderbyte_table"]
 	path = local/wunderbyte_table
 	url = https://github.com/Wunderbyte-GmbH/moodle-local_wunderbyte_table.git
+[submodule "mod/subcourse"]
+	path = mod/subcourse
+	url = https://github.com/catalyst/moodle-mod_subcourse.git
