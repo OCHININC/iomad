@@ -77,6 +77,15 @@ class main implements renderable, templatable {
         $mycompletion = mycourses_get_my_completion($sort, $dir);
         $myarchive = mycourses_get_my_archive($sort, $dir);
 
+        foreach($myarchive->mycompleted as $mid => $completedcourse) {
+            foreach($mycompletion->mynotstartedlicense as $aid => $availcourse) {
+                if($availcourse->courseid == $completedcourse->courseid) {
+                    print_r(' COURSE EXISTS IN MYNOTSTARTEDLICENSE ');
+                    unset($mycompletion->mynotstartedlicense[$aid]);
+                }
+            }
+        }
+
         $availableview = new available_view($mycompletion);
         $inprogressview = new inprogress_view($mycompletion);
         $completedview = new completed_view($myarchive);
