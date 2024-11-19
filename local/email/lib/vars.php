@@ -229,16 +229,11 @@ class EmailVars {
     function LinkURL() {
         global $CFG;
 
-        if (empty($CFG->allowthemechangeonurl)) {
-            return $this->url;
-        } else {
-            // Get the company theme.
-            if (method_exists($this->company,'get_theme')) {
-                $theme = $this->company->get_theme();
-                return new moodle_url($this->url, array('theme' => $theme));
-            } else {
-                return new moodle_url($this->url);
-            }
+        $returnurl = new moodle_url($this->url);
+        if (!empty($this->company->companyrecord->hostname)) {
+            $returnurl->set_host($this->company->companyrec->hostname);
         }
+
+        return $returnurl;
     }
 }

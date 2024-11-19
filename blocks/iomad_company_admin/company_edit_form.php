@@ -40,6 +40,7 @@ $parentid = optional_param('parentid', 0, PARAM_INT);
 $new = optional_param('createnew', 0, PARAM_INT);
 
 $context = context_system::instance();
+$systemcontext = context_system::instance();
 require_login();
 
 // Correct the navbar.
@@ -81,6 +82,22 @@ if (!$new) {
     $companyrecord = $DB->get_record('company', array('id' => $companyid), '*', MUST_EXIST);
     if ($companyrecord->previousroletemplateid == -1 ) {
         $companyrecord->previousroletemplateid = 'i';
+    }
+    // Sanitise some data
+    if (empty($companyrecord->usesignature)) {
+        $companyrecord->usesignature = false;
+    }
+    if (empty($companyrecord->uselogo)) {
+        $companyrecord->uselogo = false;
+    }
+    if (empty($companyrecord->useborder)) {
+        $companyrecord->useborder = false;
+    }
+    if (empty($companyrecord->usewatermark)) {
+        $companyrecord->usewatermark = false;
+    }
+    if (empty($companyrecord->showgrade)) {
+        $companyrecord->showgrade = false;
     }
     $companyrecord->templates = array();
     if ($companytemplates = $DB->get_records('company_role_templates_ass', array('companyid' => $companyid), null, 'templateid')) {
@@ -179,6 +196,14 @@ $companyrecord->companyfavicon = $draftcompanyfaviconid;
 
 // Are we creating a child company?
 if (!empty($new) && !empty($parentid)) {
+    // Did we stash the company information in SESSION?
+    if (!empty($SESSION->createcompanyform)) {
+        // Is this recent?
+        if (time() - $SESSION->createcompanyform->timecreated < 10) {
+            $companyrecord = $SESSION->createcompanyform;
+        }
+        unset($SESSION->createcompanyform);
+    }
     // Get the parent certificate files as default.
     $draftcompanycertificatesealid = file_get_submitted_draft_itemid('companycertificateseal');
     file_prepare_draft_area($draftcompanycertificatesealid,
@@ -333,6 +358,7 @@ if ($mform->is_cancelled()) {
 
 } else if ($data = $mform->get_data()) {
     $data->userid = $USER->id;
+    $createcompany = true;
 
     if (empty($data->validto)) {
         $data->validto = null;
@@ -354,58 +380,64 @@ if ($mform->is_cancelled()) {
         $data->custom2 = trim($data->custom2);
         $data->custom3 = trim($data->custom3);
 
-        $companyid = $DB->insert_record('company', $data);
-        $company = new company($companyid);
+        if (!empty($data->submitbutton)) {
+            // We hit create.
+            $companyid = $DB->insert_record('company', $data);
+            $company = new company($companyid);
 
-        $eventother = array('companyid' => $companyid);
+            $eventother = array('companyid' => $companyid);
 
-        $event = \block_iomad_company_admin\event\company_created::create(array('context' => context_system::instance(),
-                                                                                'userid' => $USER->id,
-                                                                                'objectid' => $companyid,
-                                                                                'other' => $eventother));
-        $event->trigger();
+            $event = \block_iomad_company_admin\event\company_created::create(array('context' => $systemcontext,
+                                                                                    'userid' => $USER->id,
+                                                                                    'objectid' => $companyid,
+                                                                                    'other' => $eventother));
+            $event->trigger();
 
-        // Set up default department.
-        company::initialise_departments($companyid);
-        $data->id = $companyid;
+            // Set up default department.
+            company::initialise_departments($companyid);
+            $data->id = $companyid;
 
-        // Set up course category for company.
-        $coursecat = new stdclass();
-        $coursecat->name = $data->name;
-        $coursecat->sortorder = 999;
-        $coursecat->id = $DB->insert_record('course_categories', $coursecat);
-        $coursecat->context = context_coursecat::instance($coursecat->id);
-        $categorycontext = $coursecat->context;
-        $categorycontext->mark_dirty();
-        $DB->update_record('course_categories', $coursecat);
-        fix_course_sortorder();
-        $companydetails = $DB->get_record('company', array('id' => $companyid));
-        $companydetails->category = $coursecat->id;
-        $DB->update_record('company', $companydetails);
-        $redirectmessage = get_string('companycreatedok', 'block_iomad_company_admin');
+            // Set up course category for company.
+            $coursecat = new stdclass();
+            $coursecat->name = $data->name;
+            $coursecat->sortorder = 999;
+            $coursecat->id = $DB->insert_record('course_categories', $coursecat);
+            $coursecat->context = context_coursecat::instance($coursecat->id);
+            $categorycontext = $coursecat->context;
+            $categorycontext->mark_dirty();
+            $DB->update_record('course_categories', $coursecat);
+            fix_course_sortorder();
+            $companydetails = $DB->get_record('company', array('id' => $companyid));
+            $companydetails->category = $coursecat->id;
+            $DB->update_record('company', $companydetails);
+            $redirectmessage = get_string('companycreatedok', 'block_iomad_company_admin');
 
-        // Deal with any parent company assignments.
-        if (!empty($companydetails->parentid)) {
-            $company = new company($companydetails->id);
-            $company->assign_parent_managers($companydetails->parentid);
-            $companylist = $linkurl;
+            // Deal with any parent company assignments.
+            if (!empty($companydetails->parentid)) {
+                $company = new company($companydetails->id);
+                $company->assign_parent_managers($companydetails->parentid);
+            }
+
+            // Deal with any assigned templates.
+            if (!empty($data->templates)) {
+                $company->assign_role_templates($data->templates);
+            }
+
+            // Deal with certificate info.
+            $certificateinforec = array('companyid' => $companyid,
+                                        'uselogo' => $data->uselogo,
+                                        'usesignature' => $data->usesignature,
+                                        'useborder' => $data->useborder,
+                                        'usewatermark' => $data->usewatermark,
+                                        'showgrade' => $data->showgrade);
+            $DB->insert_record('companycertificate', $certificateinforec);
+        } else {
             $redirectmessage = "";
+            $SESSION->createcompanyform = $data;
+            $SESSION->createcompanyform->timecreated = time();
+            $companylist = new moodle_url('/blocks/iomad_company_admin/company_edit_form.php', ['createnew' => true, 'parentid' => $data->parentid]);
+            $createcompany = false;
         }
-
-        // Deal with any assigned templates.
-        if (!empty($data->templates)) {
-            $company->assign_role_templates($data->templates);
-        }
-
-        // Deal with certificate info.
-        $certificateinforec = array('companyid' => $companyid,
-                                    'uselogo' => $data->uselogo,
-                                    'usesignature' => $data->usesignature,
-                                    'useborder' => $data->useborder,
-                                    'usewatermark' => $data->usewatermark,
-                                    'showgrade' => $data->showgrade);
-        $DB->insert_record('companycertificate', $certificateinforec);
-
     } else {
         $data->id = $companyid;
         if (!empty($data->usedefaultpaymentaccount)) {
@@ -510,134 +542,137 @@ if ($mform->is_cancelled()) {
         }
     }
 
-    $company = new company($data->id);
+    // Only do the rest of the company create stuffs if we are not re-directing back to the form on parentid change.
+    if ($createcompany) {
+        $company = new company($data->id);
 
-    // Deal with role templates.
-    if (!empty($data->roletemplate)) {
-        // We need to do something with the roles.
-        if ($data->roletemplate == 'i') {
-            if (!empty($data->parentid)) {
-                // Apply the same roles as per the parent company.
-                $company->apply_role_templates();
-            }
-        } else {
-            $company->apply_role_templates($data->roletemplate);
-        }
-    }
-
-    // Deal with email templates.
-    if (!empty($data->emailtemplate) && iomad::has_capability('local/email:edit', $context)) {
-        // We need to do something with the email templates.
-        $company->apply_email_templates($data->emailtemplate);
-    }
-
-    // Deal with any assigned templates.
-    if (empty($data->templates)) {
-        $data->templates = array();
-    }
-    $company->assign_role_templates($data->templates, true);
-
-    // Deal with logo config settings.
-    $fs = get_file_storage();
-    if (!empty($data->companylogo)) {
-        file_save_draft_area_files($data->companylogo,
-                                   $context->id,
-                                   'core_admin',
-                                   'logo' . $data->id,
-                                   0,
-                                   ['maxfiles' => 1]);
-
-        // Set the plugin config so it can actually be picked up.
-        if ($files = $fs->get_area_files($context->id, 'core_admin', 'logo'. $data->id)) {
-            foreach ($files as $file) {
-                if ($file->get_filename() != '.') {
-                    break;
+        // Deal with role templates.
+        if (!empty($data->roletemplate)) {
+            // We need to do something with the roles.
+            if ($data->roletemplate == 'i') {
+                if (!empty($data->parentid)) {
+                    // Apply the same roles as per the parent company.
+                    $company->apply_role_templates();
                 }
+            } else {
+                $company->apply_role_templates($data->roletemplate);
             }
-            set_config('logo' . $data->id, $file->get_filepath() . $file->get_filename(), 'core_admin');
-        } else {
-            set_config('logo' . $data->id, '', 'core_admin');
         }
-    }
-    if (!empty($data->companylogocompact)) {
-        file_save_draft_area_files($data->companylogocompact,
-                                   $context->id,
-                                   'core_admin',
-                                   'logocompact' . $data->id,
-                                   0,
-                                   ['maxfiles' => 1]);
 
-        // Set the plugin config so it can actually be picked up.
-        if ($files = $fs->get_area_files($context->id, 'core_admin', 'logocompact'. $data->id)) {
-            foreach ($files as $file) {
-                if ($file->get_filename() != '.') {
-                    break;
-                }
-            }
-            set_config('logocompact' . $data->id, $file->get_filepath() . $file->get_filename(), 'core_admin');
-        } else {
-            set_config('logocompact' . $data->id, '', 'core_admin');
+        // Deal with email templates.
+        if (!empty($data->emailtemplate) && iomad::has_capability('local/email:edit', $companycontext)) {
+            // We need to do something with the email templates.
+            $company->apply_email_templates($data->emailtemplate);
         }
-    }
-    if (!empty($data->companyfavicon)) {
-        file_save_draft_area_files($data->companyfavicon,
-                                   $context->id,
-                                   'core_admin',
-                                   'favicon' . $data->id,
-                                   0,
-                                   ['maxfiles' => 1]);
 
-        // Set the plugin config so it can actually be picked up.
-        if ($files = $fs->get_area_files($context->id, 'core_admin', 'favicon'. $data->id)) {
-            foreach ($files as $file) {
-                if ($file->get_filename() != '.') {
-                    break;
-                }
-            }
-            set_config('favicon' . $data->id, $file->get_filepath() . $file->get_filename(), 'core_admin');
-        } else {
-            set_config('favicon' . $data->id, '', 'core_admin');
+        // Deal with any assigned templates.
+        if (empty($data->templates)) {
+            $data->templates = array();
         }
-    }
-    if (!empty($data->companycertificateseal)) {
-        file_save_draft_area_files($data->companycertificateseal,
-                                   $context->id,
-                                   'local_iomad',
-                                   'companycertificateseal',
-                                   $data->id,
-                                   array('subdirs' => 0, 'maxbytes' => 150 * 1024, 'maxfiles' => 1));
-    }
-    if (!empty($data->companycertificatesignature)) {
-        file_save_draft_area_files($data->companycertificatesignature,
-                                   $context->id,
-                                   'local_iomad',
-                                   'companycertificatesignature',
-                                   $data->id,
-                                   array('subdirs' => 0, 'maxbytes' => 150 * 1024, 'maxfiles' => 1));
-    }
-    if (!empty($data->companycertificateborder)) {
-        file_save_draft_area_files($data->companycertificateborder,
-                                   $context->id,
-                                   'local_iomad',
-                                   'companycertificateborder',
-                                   $data->id,
-                                   array('subdirs' => 0, 'maxbytes' => 150 * 1024, 'maxfiles' => 1));
-    }
-    if (!empty($data->companycertificatewatermark)) {
-        file_save_draft_area_files($data->companycertificatewatermark,
-                                   $context->id,
-                                   'local_iomad',
-                                   'companycertificatewatermark',
-                                   $data->id,
-                                   array('subdirs' => 0, 'maxbytes' => 150 * 1024, 'maxfiles' => 1));
-    }
-    if (!empty($data->companydomains)) {
-        $domainsarray = preg_split('/[\r\n]+/', $data->companydomains, -1, PREG_SPLIT_NO_EMPTY);
-        // Delete any recorded domains for this company.
-        $DB->delete_records('company_domains', array('companyid' => $companyid));
-        foreach ($domainsarray as $domain) {
-            if (!empty($domain)) {
-                $DB->insert_record('company_domains', array('companyid' => $companyid, 'domain' => $domain));
+        $company->assign_role_templates($data->templates, true);
+
+        // Deal with logo config settings.
+        $fs = get_file_storage();
+        if (!empty($data->companylogo)) {
+            file_save_draft_area_files($data->companylogo,
+                                       $systemcontext->id,
+                                       'core_admin',
+                                       'logo' . $data->id,
+                                       0,
+                                       ['maxfiles' => 1]);
+
+            // Set the plugin config so it can actually be picked up.
+            if ($files = $fs->get_area_files($systemcontext->id, 'core_admin', 'logo'. $data->id)) {
+                foreach ($files as $file) {
+                    if ($file->get_filename() != '.') {
+                        break;
+                    }
+                }
+                set_config('logo' . $data->id, $file->get_filepath() . $file->get_filename(), 'core_admin');
+            } else {
+                set_config('logo' . $data->id, '', 'core_admin');
+            }
+        }
+        if (!empty($data->companylogocompact)) {
+            file_save_draft_area_files($data->companylogocompact,
+                                       $systemcontext->id,
+                                       'core_admin',
+                                       'logocompact' . $data->id,
+                                       0,
+                                       ['maxfiles' => 1]);
+
+            // Set the plugin config so it can actually be picked up.
+            if ($files = $fs->get_area_files($systemcontext->id, 'core_admin', 'logocompact'. $data->id)) {
+                foreach ($files as $file) {
+                    if ($file->get_filename() != '.') {
+                        break;
+                    }
+                }
+                set_config('logocompact' . $data->id, $file->get_filepath() . $file->get_filename(), 'core_admin');
+            } else {
+                set_config('logocompact' . $data->id, '', 'core_admin');
+            }
+        }
+        if (!empty($data->companyfavicon)) {
+            file_save_draft_area_files($data->companyfavicon,
+                                       $systemcontext->id,
+                                       'core_admin',
+                                       'favicon' . $data->id,
+                                       0,
+                                       ['maxfiles' => 1]);
+
+            // Set the plugin config so it can actually be picked up.
+            if ($files = $fs->get_area_files($systemcontext->id, 'core_admin', 'favicon'. $data->id)) {
+                foreach ($files as $file) {
+                    if ($file->get_filename() != '.') {
+                        break;
+                    }
+                }
+                set_config('favicon' . $data->id, $file->get_filepath() . $file->get_filename(), 'core_admin');
+            } else {
+                set_config('favicon' . $data->id, '', 'core_admin');
+            }
+        }
+        if (!empty($data->companycertificateseal)) {
+            file_save_draft_area_files($data->companycertificateseal,
+                                       $systemcontext->id,
+                                       'local_iomad',
+                                       'companycertificateseal',
+                                       $data->id,
+                                       array('subdirs' => 0, 'maxbytes' => 150 * 1024, 'maxfiles' => 1));
+        }
+        if (!empty($data->companycertificatesignature)) {
+            file_save_draft_area_files($data->companycertificatesignature,
+                                       $systemcontext->id,
+                                       'local_iomad',
+                                       'companycertificatesignature',
+                                       $data->id,
+                                       array('subdirs' => 0, 'maxbytes' => 150 * 1024, 'maxfiles' => 1));
+        }
+        if (!empty($data->companycertificateborder)) {
+            file_save_draft_area_files($data->companycertificateborder,
+                                       $systemcontext->id,
+                                       'local_iomad',
+                                       'companycertificateborder',
+                                       $data->id,
+                                       array('subdirs' => 0, 'maxbytes' => 150 * 1024, 'maxfiles' => 1));
+        }
+        if (!empty($data->companycertificatewatermark)) {
+            file_save_draft_area_files($data->companycertificatewatermark,
+                                       $systemcontext->id,
+                                       'local_iomad',
+                                       'companycertificatewatermark',
+                                       $data->id,
+                                       array('subdirs' => 0, 'maxbytes' => 150 * 1024, 'maxfiles' => 1));
+        }
+        if (!empty($data->companydomains)) {
+            $domainsarray = preg_split('/[\r\n]+/', $data->companydomains, -1, PREG_SPLIT_NO_EMPTY);
+            // Delete any recorded domains for this company.
+            $DB->delete_records('company_domains', array('companyid' => $companyid));
+            foreach ($domainsarray as $domain) {
+                if (!empty($domain)) {
+                    $DB->insert_record('company_domains', array('companyid' => $companyid, 'domain' => $domain));
+                }
             }
         }
     }

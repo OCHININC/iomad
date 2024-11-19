@@ -36,6 +36,7 @@ $THEME->usefallback = true;
 $THEME->scss = function($theme) {
     return theme_iomadboost_get_main_scss_content($theme);
 };
+$THEME->isiomadtheme = true;
 
 $THEME->layouts = [
     // Most backwards compatible layout without the blocks.

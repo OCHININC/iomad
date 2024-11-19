@@ -445,7 +445,13 @@ class microlearning {
                 // Update the stored nugget schedules.
                 $DB->set_field('microlearning_nugget_sched', 'scheduledate', $scheduledata->schedulearray[$nuggetid], array('nuggetid' => $nuggetid));
                 $DB->set_field('microlearning_nugget_sched', 'due_date', $scheduledata->duedatearray[$nuggetid], array('nuggetid' => $nuggetid));
+                if (empty($scheduledata->reminder1array[$nuggetid])) {
+                    $scheduledata->reminder1array[$nuggetid] = 0;
+                }
                 $DB->set_field('microlearning_nugget_sched', 'reminder1_date', $scheduledata->reminder1array[$nuggetid], array('nuggetid' => $nuggetid));
+                if (empty($scheduledata->reminder2array[$nuggetid])) {
+                    $scheduledata->reminder2array[$nuggetid] = 0;
+                }
                 $DB->set_field('microlearning_nugget_sched', 'reminder2_date', $scheduledata->reminder2array[$nuggetid], array('nuggetid' => $nuggetid));
             } else {
                 // Make sure we have all the defaults.
@@ -457,6 +463,12 @@ class microlearning {
                 }
                 if (empty($scheduledata->reminder2array[$nuggetid])) {
                     $scheduledata->reminder2array[$nuggetid] = 0;
+                }
+                if (empty($scheduledata->threadinfo->send_message)) {
+                    $scheduledata->threadinfo->send_message = 0;
+                }
+                if (empty($scheduledata->threadinfo->send_reminder)) {
+                    $scheduledata->threadinfo->send_reminder = 0;
                 }
                 $DB->insert_record('microlearning_nugget_sched', array('scheduledate' => $scheduledata->schedulearray[$nuggetid],
                                                                        'nuggetid' => $nuggetid,
@@ -979,6 +991,7 @@ class microlearning {
                                                    ON (mtu.threadid = mt.id AND mt.send_message = 1)
                                                    AND mtu.message_delivered = 0
                                                    WHERE mtu.timecompleted IS NULL
+                                                   AND mt.active = 1
                                                    AND mtu.schedule_date < :runtime",
                                                    array('runtime' => $runtime))) {
             foreach ($scheduleusers as $scheduleuser) {
@@ -1006,13 +1019,15 @@ class microlearning {
                                                    JOIN {microlearning_thread} mt
                                                    ON (mtu.threadid = mt.id)
                                                    WHERE mt.send_reminder = 1
+                                                   AND mt.active = 1
                                                    AND mtu.timecompleted IS NULL
                                                    AND mtu.reminder1_delivered = 0
                                                    AND mtu.reminder1_date IS NOT NULL
+                                                   AND mtu.reminder1_date < mtu.due_date
                                                    AND mtu.reminder1_date < :runtime",
                                                    array('runtime' => $runtime))) {
             foreach ($reminder1users as $reminder1user) {
-                $reminder1user->reminder1_delivered = 1;
+                $reminder1user->reminder1_delivered = true;
 
                 if ($user = $DB->get_record('user', array('id' => $reminder1user->userid, 'suspended' => 0, 'deleted' => 0))) {
                     // Get the email payload.
@@ -1023,7 +1038,6 @@ class microlearning {
                         $nugget->url = new moodle_url('/blocks/iomad_microlearning/land.php', array('nuggetid' => $nugget->id, 'userid' => $user->id, 'accesskey' =>$reminder1user->accesskey));
                         // Fire the email.
                         EmailTemplate::send('microlearning_nugget_reminder1', array('user' => $user, 'company' => $company, 'nugget' => $nugget));
-                        $DB->set_field('microlearning_thread_user', 'reminder1_delivered', true, array('id' => $scheduleuser->id));
                     }
                 }
                 $DB->update_record('microlearning_thread_user', $reminder1user);
@@ -1037,13 +1051,16 @@ class microlearning {
                                                    JOIN {microlearning_thread} mt
                                                    ON (mtu.threadid = mt.id)
                                                    WHERE mt.send_reminder = 1
+                                                   AND mt.active = 1
                                                    AND mtu.timecompleted IS NULL
                                                    AND mtu.reminder2_delivered = 0
                                                    AND mtu.reminder2_date IS NOT NULL
+                                                   AND mtu.reminder2_date < mtu.due_date
                                                    AND mtu.reminder2_date < :runtime",
                                                    array('runtime' => $runtime))) {
             foreach ($reminder2users as $reminder2user) {
-                $reminder2user->reminder2_delivered = 1;
+                $reminder2user->reminder2_delivered = true;
+                $reminder2user->reminder1_delivered = true;
 
                 if ($user = $DB->get_record('user', array('id' => $reminder2user->userid, 'suspended' => 0, 'deleted' => 0))) {
                     // Get the email payload.
@@ -1054,7 +1071,6 @@ class microlearning {
                         $nugget->url = new moodle_url('/blocks/iomad_microlearning/land.php', array('nuggetid' => $nugget->id, 'userid' => $user->id, 'accesskey' =>$reminder2user->accesskey));
                         // Fire the email.
                         EmailTemplate::send('microlearning_nugget_reminder2', array('user' => $user, 'company' => $company, 'nugget' => $nugget));
-                        $DB->set_field('microlearning_thread_user', 'reminder1_delivered', true, array('id' => $scheduleuser->id));
                     }
                 }
                 $DB->update_record('microlearning_thread_user', $reminder2user);

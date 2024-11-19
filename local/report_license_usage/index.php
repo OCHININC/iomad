@@ -200,7 +200,7 @@ $select->formid = 'chooselicense';
 $licenseselectoutput = html_writer::tag('div', $output->render($select), array('id' => 'iomad_license_selector'));
 
 // Set up the filter form.
-$mform = new iomad_date_filter_form($baseurl, $params);
+$mform = new \local_iomad\forms\date_search_form($baseurl, $params);
 $mform->set_data(array('departmentid' => $departmentid));
 $options = $params;
 $options['compfromraw'] = $from;
@@ -229,7 +229,9 @@ if (empty($licenseid)) {
 }
 
 // Display the user filter form.
+echo html_writer::start_tag('div', ['class' => 'iomaddatesearchform']);
 $mform->display();
+echo html_writer::end_tag('div');
 echo html_writer::end_tag('div');
 echo html_writer::end_tag('div');
 

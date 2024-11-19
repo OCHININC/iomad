@@ -958,7 +958,7 @@ class company {
         $params['companyid'] = $this->id;
         $params['companyidforjoin'] = $this->id;
 
-        $sql = " SELECT u.id, u.id AS mid
+        $sql = " SELECT DISTINCT u.id, u.id AS mid
                 FROM
                     {company_users} cu
                     INNER JOIN {user} u ON (cu.userid = u.id)
@@ -3476,7 +3476,8 @@ class company {
             // is the user in a child company?
             $company = new company($companyid);
             $children = $company->get_child_companies_recursive();
-            if ($DB->get_records_sql("SELECT id FROM {company_users}
+            if (!empty($childred) &&
+                $DB->get_records_sql("SELECT id FROM {company_users}
                                       WHERE userid = :userid
                                       and companyid IN (" . join(',', array_keys($children)) . ")",
                                       ['userid' => $userid])) {

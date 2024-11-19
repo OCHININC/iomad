@@ -283,6 +283,16 @@ class EmailTemplate {
                 $email->body = $this->body();
                 $this->template->signature = '';
             }
+            // We get duplicate http(s):// in the body when we replace sometimes so strip them.
+            $search = ['http://http://http://',
+                       'https://https://https://',
+                       'http://http://',
+                       'https://https://'];
+            $replace = ['http://',
+                        'https://',
+                        'http://',
+                        'https://'];
+            $email->body = str_replace($search, $replace, $email->body);
             $email->varsreplaced = 1;
             $email->userid = $this->user->id;
             $email->due = $this->due;

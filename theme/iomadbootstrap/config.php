@@ -30,6 +30,7 @@ defined('MOODLE_INTERNAL') || die();
 $THEME->name = 'iomadbootstrap';
 
 $THEME->sheets = ['iomad'];
+$THEME->isiomadtheme = true;
 
 $THEME->layouts = [
     // Most backwards compatible layout without the blocks - this is the layout used by default.

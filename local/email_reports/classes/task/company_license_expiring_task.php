@@ -55,7 +55,7 @@ class company_license_expiring_task extends \core\task\scheduled_task {
 
         // Get all of the licenses which are going to expire in the next 30 days and have un-unsed slots.
         $licenses = $DB->get_records_sql("SELECT * FROM {companylicense}
-                                          WHERE used < allocated
+                                          WHERE used < allocation
                                           AND expirydate > :now
                                           AND expirydate < :warn",
                                           ['now' => $runtime,

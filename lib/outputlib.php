@@ -692,6 +692,9 @@ class theme_config {
      */
     public $activityheaderconfig = [];
 
+    // IOMAD - added option to show if this is an IOMAD theme or not
+    public $isiomadtheme = false;
+
     /**
      * Load the config.php file for a particular theme, and return an instance
      * of this class. (That is, this is a factory method.)
@@ -771,6 +774,7 @@ class theme_config {
             'scss', 'extrascsscallback', 'prescsscallback', 'csstreepostprocessor', 'addblockposition',
             'iconsystem', 'precompiledcsscallback', 'haseditswitch', 'usescourseindex', 'activityheaderconfig',
             'removedprimarynavitems',
+            'isiomadtheme',
         ];
 
         foreach ($config as $key=>$value) {

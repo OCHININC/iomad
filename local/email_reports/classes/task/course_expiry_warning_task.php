@@ -65,7 +65,7 @@ class course_expiry_warning_task extends \core\task\scheduled_task {
         // Deal with courses which have expiry warnings
         $companies = [];
         foreach ($expirycourses as $expirycourse) {
-            $targettime = $runtime - ($expirycourse->validlength * 86400) - ($expirycourse->warnexpire * 86400);
+            $targettime = $expirycourse->warnexpire * 86400;
 
             // Get the companies from the list of users in the temp table.
             $companysql = "SELECT DISTINCT lit.companyid
@@ -76,12 +76,15 @@ class course_expiry_warning_task extends \core\task\scheduled_task {
                                 AND co.id = :expirycourseid
                                 AND u.deleted = 0
                                 AND u.suspended = 0
-                                AND lit.timecompleted < :targettime
+                                AND lit.timeexpires > 0
+                                AND lit.timeexpires - :targettime < :runtime
                                 AND lit.expiredstop = 0
                                 AND lit.id IN (
                                     SELECT max(id) FROM {local_iomad_track})";
 
-            $foundcompanies = $DB->get_records_sql($companysql, ['expirycourseid' => $expirycourse->id, 'targettime' => $targettime]);
+            $foundcompanies = $DB->get_records_sql($companysql, ['expirycourseid' => $expirycourse->id,
+                                                                 'targettime' => $targettime,
+                                                                 'runtime' => $runtime]);
             foreach ($foundcompanies as $id => $foundcompany) {
                 $companies[$id] = $foundcompany;
             }
@@ -203,7 +206,7 @@ class course_expiry_warning_task extends \core\task\scheduled_task {
         // Deal with users.
         foreach ($expirycourses as $expirycourse) {
             mtrace("Dealing with course id $expirycourse->courseid");
-            $targettime = $runtime - ($expirycourse->validlength * 86400) - ($expirycourse->warnexpire * 86400);
+            $targettime = $expirycourse->warnexpire * 86400;
             $expiredsql = "SELECT lit.*, c.name AS companyname, u.firstname,u.lastname,u.username,u.email,u.lang
                            FROM {local_iomad_track} lit
                            JOIN {company} c ON (lit.companyid = c.id)
@@ -211,17 +214,23 @@ class course_expiry_warning_task extends \core\task\scheduled_task {
                            JOIN {course} co ON (lit.courseid = co.id)
                            WHERE co.visible = 1
                            AND co.id = :expirycourseid
-                           AND lit.timecompleted < :targettime
+                           AND lit.timeexpires > 0
+                           AND lit.timeexpires - :targettime < :runtime
                            AND u.deleted = 0
                            AND u.suspended = 0
                            AND lit.expiredstop = 0
                            AND lit.id IN (
-                               SELECT max(id) FROM {local_iomad_track}
+                               SELECT max(id)
+                               FROM {local_iomad_track}
+                               WHERE courseid = co.id
+                               AND companyid = c.id
                            GROUP BY userid,courseid)";
 
             // Email all of the users
             mtrace("getting expired users");
-            $allusers = $DB->get_records_sql($expiredsql, ['expirycourseid' => $expirycourse->courseid, 'targettime' => $targettime]);
+            $allusers = $DB->get_records_sql($expiredsql, ['expirycourseid' => $expirycourse->courseid,
+                                                           'targettime' => $targettime,
+                                                           'runtime' => $runtime]);
 
             foreach ($allusers as $compuser) {
                 mtrace("Dealing with user id $compuser->userid");
@@ -252,6 +261,7 @@ class course_expiry_warning_task extends \core\task\scheduled_task {
                 $event = \block_iomad_company_admin\event\user_course_expired::create(array('context' => context_course::instance($course->id),
                                                                                             'courseid' => $course->id,
                                                                                             'objectid' => $course->id,
+                                                                                            'companyid' => $company->id,
                                                                                             'userid' => $user->id));
                 $event->trigger();
 
@@ -346,7 +356,7 @@ class course_expiry_warning_task extends \core\task\scheduled_task {
             $expiretime = 24 * 60 * 60 * $completionexpirecourse->expireafter;
             $userlist = $DB->get_records_sql("SELECT lit.* FROM
                                               {local_iomad_track} lit
-                                              JOIN {user_enrolments} ue ON (lit.userid = ue.userid)
+                                              JOIN {user_enrolments} ue ON (lit.userid = ue.userid AND lit.timestarted = ue.timecreated)
                                               JOIN {enrol} e ON (lit.courseid = e.courseid AND ue.enrolid = e.id)
                                               JOIN {course} co ON (lit.courseid = co.id AND e.courseid = co.id)
                                               WHERE co.visible = 1
@@ -358,7 +368,7 @@ class course_expiry_warning_task extends \core\task\scheduled_task {
 
             //  Cycle through any found users.
             foreach ($userlist as $founduser) {
-                if (!$DB->get_record('local_iomad_track', array('userid' => $founduser->userid, 'courseid' => $founduser->courseid, 'timecompleted' => null))) {
+                if (!$DB->get_records('local_iomad_track', array('userid' => $founduser->userid, 'courseid' => $founduser->courseid, 'timecompleted' => null))) {
                     // Expire the user from the course.
                     mtrace("expiring user $founduser->userid from course $founduser->courseid");
                     $event = \block_iomad_company_admin\event\user_course_expired::create(array('context' => context_course::instance($founduser->courseid),
@@ -372,5 +382,4 @@ class course_expiry_warning_task extends \core\task\scheduled_task {
 
         mtrace("email reporting course expiry warning task completed at " . date('d M Y h:i:s', time()));
     }
-
 }

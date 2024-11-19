@@ -990,6 +990,7 @@ if ($mform->is_cancelled()) {
 
                     company_user::enrol($user, [$ccache[$shortname]->id], $companyid , $roleid);
                     $coursecontext = context_course::instance($ccache[$shortname]->id);
+                    EmailTemplate::send('user_added_to_course', ['course' => $ccache[$shortname], 'user' => $user]);
 
                     // find group to add to
                     if (!empty($user->{'group'.$i})) {
@@ -1052,9 +1053,13 @@ if ($mform->is_cancelled()) {
                     // add the user to the courses selected in the upload form.
                     $courseids = array();
                     foreach ($formdata->selectedcourses as $selectedcourse) {
-                        $courseids[] = $selectedcourse->id;
+                        $courseids[] = $selectedcourse;
                     }
                     company_user::enrol($user, $courseids, $companyid);
+                    foreach ($courseids as $courseid) {
+                        $emailcourse = $DB->get_record('course', ['id' => $courseid]);
+                        EmailTemplate::send('user_added_to_course', ['course' => $emailcourse, 'user' => $user]);
+                    }
                 }
                 if (preg_match('/^department\d+$/', $column)) {
                     $i = substr($column, 10);
@@ -1105,7 +1110,11 @@ if ($mform->is_cancelled()) {
 
             // Enrol user into courses that were selected on the form.
             if (isset($formdata->selectedcourses) ) {
-                company_user::enrol($user, array_keys($formdata->selectedcourses) );
+                company_user::enrol($user, array_values($formdata->selectedcourses) );
+                foreach (array_values($formdata->selectedcourses) as $courseid) {
+                    $emailcourse = $DB->get_record('course', ['id' => $courseid]);
+                    EmailTemplate::send('user_added_to_course', ['course' => $emailcourse, 'user' => $user]);
+                }
             }
 
             // Assign any licenses.

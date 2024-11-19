@@ -2391,6 +2391,7 @@ class block_iomad_company_admin_external extends external_api {
                 }
 
                 // Do we have a default access period?
+                $validlength = 30;
                 if (empty($enrolment['timeend'])) {
                     if (!empty($CFG->commerce_admin_default_license_access_length)) {
                         $enrolment['timeend'] = $runtime + $CFG->commerce_admin_default_license_access_length * 24 *60 * 60;
@@ -2398,7 +2399,6 @@ class block_iomad_company_admin_external extends external_api {
                     } else {
                         // Set it to 30.
                         $enrolment['timeend'] = $runtime + 30 * 24 * 60 * 60;
-                        $validlength = 30;
                     }
                 }
 
