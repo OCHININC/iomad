@@ -4,7 +4,7 @@ on:
   push:
     branches-ignore:
       - main
-      - MOODLE_[0-9]+_STABLE
+      - OCHIN_IOMAD_[0-9]+_STABLE
     tags-ignore:
       - v[0-9]+.[0-9]+.[0-9]+*
   workflow_dispatch:
@@ -24,6 +24,8 @@ jobs:
     steps:
       - name: Checking out code
         uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Configuring node & npm
         uses: actions/setup-node@v4
@@ -104,6 +106,8 @@ jobs:
 
       - name: Checking out code from ${{ env.GITHUB_REF_SLUG }}
         uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Setting up PHPUnit
         env:

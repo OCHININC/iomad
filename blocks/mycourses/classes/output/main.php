@@ -80,7 +80,6 @@ class main implements renderable, templatable {
         foreach($myarchive->mycompleted as $mid => $completedcourse) {
             foreach($mycompletion->mynotstartedlicense as $aid => $availcourse) {
                 if($availcourse->courseid == $completedcourse->courseid) {
-                    print_r(' COURSE EXISTS IN MYNOTSTARTEDLICENSE ');
                     unset($mycompletion->mynotstartedlicense[$aid]);
                 }
             }
