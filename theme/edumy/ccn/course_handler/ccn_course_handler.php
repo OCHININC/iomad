@@ -434,7 +434,7 @@ class ccnCourseHandler {
     return $ccnReturn;
   }
 
-  public function ccnBuildFilterToggle($ccnParam, $ccnValue = null, $ccnIdentifiedBy) {
+  public function ccnBuildFilterToggle($ccnParam, $ccnValue, $ccnIdentifiedBy) {
 
 
     $ccnBuildString = $this->ccnBuildFilterCoursesUrl($ccnParam, $ccnValue);
@@ -472,7 +472,7 @@ class ccnCourseHandler {
     return (int)0;
   }
 
-  public function ccnBuildFilterCoursesUrl($ccnParam, $ccnValue){
+  public function ccnBuildFilterCoursesUrl($ccnParam, $ccnValue = null){
 
     global $PAGE;
 

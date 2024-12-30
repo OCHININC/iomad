@@ -717,35 +717,37 @@ return $output;
 
             $ccnMenuItemIcon = '';
 
-            if(strpos($value->url, '/my')){
-              $ccnMenuItemIcon = '<i class="icon fa fa-fw flaticon-puzzle-1"></i>';
-            }
-            if(strpos($value->url, '/profile.php')){
-              $ccnMenuItemIcon = '<i class="icon fa fa-fw flaticon-student"></i>';
-            }
-            if(strpos($value->url, '/grade')){
-              $ccnMenuItemIcon = '<i class="icon fa fa-fw flaticon-rating"></i>';
-            }
-            if(strpos($value->url, '/message')){
-              $ccnMenuItemIcon = '<i class="icon fa fa-fw flaticon-speech-bubble"></i>';
-            }
-            if(strpos($value->url, '/preferences.php')){
-              $ccnMenuItemIcon = '<i class="icon fa fa-fw flaticon-settings"></i>';
-            }
-            if(strpos($value->url, '/logout.php')){
-              $ccnMenuItemIcon = '<i class="icon fa fa-fw flaticon-logout"></i>';
-            }
-            if(strpos($value->url, '/switchrole.php')){
-              $ccnMenuItemIcon = '<i class="icon fa fa-fw flaticon-add-contact"></i>';
-            }
-            if(strpos($value->url, '/calendar')){
-              $ccnMenuItemIcon = '<i class="icon fa fa-fw flaticon-calendar"></i>';
-            }
-            if(strpos($value->url, '/files.php')){
-              $ccnMenuItemIcon = '<i class="icon fa fa-fw ccn-flaticon-document"></i>';
-            }
-            if(strpos($value->url, '/reportbuilder/index.php')){
-              $ccnMenuItemIcon = '<i class="icon fa fa-fw flaticon-checklist"></i>';
+            if(property_exists($value, 'url')) {
+                if(strpos($value->url, '/my')){
+                $ccnMenuItemIcon = '<i class="icon fa fa-fw flaticon-puzzle-1"></i>';
+                }
+                if(strpos($value->url, '/profile.php')){
+                $ccnMenuItemIcon = '<i class="icon fa fa-fw flaticon-student"></i>';
+                }
+                if(strpos($value->url, '/grade')){
+                $ccnMenuItemIcon = '<i class="icon fa fa-fw flaticon-rating"></i>';
+                }
+                if(strpos($value->url, '/message')){
+                $ccnMenuItemIcon = '<i class="icon fa fa-fw flaticon-speech-bubble"></i>';
+                }
+                if(strpos($value->url, '/preferences.php')){
+                $ccnMenuItemIcon = '<i class="icon fa fa-fw flaticon-settings"></i>';
+                }
+                if(strpos($value->url, '/logout.php')){
+                $ccnMenuItemIcon = '<i class="icon fa fa-fw flaticon-logout"></i>';
+                }
+                if(strpos($value->url, '/switchrole.php')){
+                $ccnMenuItemIcon = '<i class="icon fa fa-fw flaticon-add-contact"></i>';
+                }
+                if(strpos($value->url, '/calendar')){
+                $ccnMenuItemIcon = '<i class="icon fa fa-fw flaticon-calendar"></i>';
+                }
+                if(strpos($value->url, '/files.php')){
+                $ccnMenuItemIcon = '<i class="icon fa fa-fw ccn-flaticon-document"></i>';
+                }
+                if(strpos($value->url, '/reportbuilder/index.php')){
+                $ccnMenuItemIcon = '<i class="icon fa fa-fw flaticon-checklist"></i>';
+                }
             }
             if(isset($value->imgsrc) && !empty($value->imgsrc)){
               $ccnMenuItemIcon = '<img class="iconsmall" src="'.$value->imgsrc.'" alt=""/>';

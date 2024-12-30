@@ -274,7 +274,7 @@ if((int)$ccnMdlVersion >= 400) {
   $templatecontext['mobileprimarynav'] = $primarymenu['mobileprimarynav'];
   $templatecontext['headercontent'] = $headercontent;
   $templatecontext['overflow'] = $overflow;
-  $templatecontext['addblockbutton'] = $addblockbutton;
+  $templatecontext['addblockbutton'] = $addblockbutton ?? '';
   // 'primarymoremenu' => $primarymenu['moremenu'],
   // 'secondarymoremenu' => $secondarynavigation ? : false,
   // 'eithermoremenu' => !empty($primarymenu['moremenu']) || $secondarynavigation ? true : false,
@@ -373,6 +373,7 @@ $ccnControlBlockListUri = $CFG->wwwroot . '/theme/edumy/ccn/visualize/ccn_block/
 $ccnControlBlockListUriThumb = $CFG->wwwroot . '/theme/edumy/ccn/visualize/ccn_block/jpeg/thumb/';
 $PAGE->requires->js_init_call('ccnCommentHandler', array(get_string('add_comment', 'theme_edumy')));
 $PAGE->requires->js_init_call('ccnControl', array($ccnControlBlockListUri, $ccnControlBlockListUriThumb, $ccnLcVbCollection, $ccnMdlVersion));
+//$PAGE->set_secondary_navigation(true);
 $nav = $PAGE->flatnav;
 $templatecontext['flatnavigation'] = $nav;
 $templatecontext['firstcollectionlabel'] = $nav->get_collectionlabel();

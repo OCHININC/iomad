@@ -10,7 +10,7 @@ class ccnBlockHandler {
   public function ccnGetBlockApplicability($ccnBlockTypes) {
     global $PAGE;
 
-    $ccnExposeBlocks = $PAGE->theme->settings->dev_expose_blocks;
+    $ccnExposeBlocks = $PAGE->theme->settings->dev_expose_blocks ?? '';
 
     if($ccnExposeBlocks !== '1') {
       $ccnAssumeTrulyAll = array('trulyAll');

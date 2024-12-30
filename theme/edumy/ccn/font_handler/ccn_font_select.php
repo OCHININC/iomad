@@ -9,7 +9,7 @@ global $PAGE;
 
 $ccnIconSet_Edumy = $ccnIconSet_Cocoon = $ccnIconSet_FontAwesome = $ccnIconSet_LineAwesome = array();
 
-if ($PAGE->theme->settings->iconset_edumy !== '0') {
+if (!property_exists($PAGE->theme->settings, 'iconset_edumy') || $PAGE->theme->settings->iconset_edumy !== '0') {
   $ccnIconSet_Edumy = array(
     'flaticon-user'=>'[Edumy] User',
   	'flaticon-shopping-bag'=>'[Edumy] Shopping Bag',
@@ -113,7 +113,7 @@ if ($PAGE->theme->settings->iconset_edumy !== '0') {
   );
 }
 
-if ($PAGE->theme->settings->iconset_cocoon !== '0') {
+if (!property_exists($PAGE->theme->settings, 'iconset_cocoon') || $PAGE->theme->settings->iconset_cocoon !== '0') {
   // Begin Cocoon Icons
   $ccnIconSet_Cocoon = array(
     'ccn-flaticon-add'=>'[Cocoon] Add',
@@ -499,7 +499,7 @@ if ($PAGE->theme->settings->iconset_cocoon !== '0') {
   );
 }
 
-if ($PAGE->theme->settings->iconset_fontawesome !== '0') {
+if (!property_exists($PAGE->theme->settings, 'iconset_fontawesome') || $PAGE->theme->settings->iconset_fontawesome !== '0') {
   // Begin FontAwesome icons
   $ccnIconSet_FontAwesome = array(
     'fa fa-glass'=>'[FontAwesome] Glass',
@@ -1291,7 +1291,7 @@ if ($PAGE->theme->settings->iconset_fontawesome !== '0') {
   );
 }
 
-if ($PAGE->theme->settings->iconset_lineawesome !== '0') {
+if (!property_exists($PAGE->theme->settings, 'iconset_lineawesome') || $PAGE->theme->settings->iconset_lineawesome !== '0') {
   // Begin Lineawesome icons
   $ccnIconSet_LineAwesome = array(
     'la la-500px'=>'[LineAwesome] 500px',

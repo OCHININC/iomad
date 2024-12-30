@@ -112,3 +112,4 @@ $string['typesample'] = 'Sample';
 $string['samplecode'] = 'Certificate Number :';
 $string['samplesigned'] = 'Signed: ';
 $string['sampleonbehalfof'] = 'On behalf of Company';
+$string['iomad_useicons'] = 'Use icons';
