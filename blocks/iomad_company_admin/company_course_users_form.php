@@ -30,8 +30,13 @@ $returnurl = optional_param('returnurl', '', PARAM_LOCALURL);
 $companyid = optional_param('companyid', 0, PARAM_INTEGER);
 $courses = optional_param_array('courses', array(), PARAM_INTEGER);
 $departmentid = optional_param('deptid', 0, PARAM_INTEGER);
-$selectedcourses = optional_param_array('selectedcourses', array('-1'), PARAM_INTEGER);
 $groupid = optional_param('groupid', 0, PARAM_INTEGER);
+
+if (isset($_POST['selectedcourses']) && is_array($_POST['selectedcourses'])) {
+    $selectedcourses = optional_param_array('selectedcourses', null, PARAM_INTEGER);
+} else {
+    $selectedcourses = ['-1'];
+}
 
 if (empty($courses) && !empty($selectedcourses)) {
     $courses = $selectedcourses;

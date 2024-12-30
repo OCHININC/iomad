@@ -60,8 +60,7 @@ abstract class company_course_selector_base extends course_selector_base {
                 $context = context_course::instance($id);
                 if (count_enrolled_users($context) > 0) {
                     $courselist[ $id ]->hasenrollments = true;
-                    $courselist[ $id ]->fullname = "<span class=\"hasenrollments\">
-                                                    {$course->fullname} ($strhasenrollments)</span>";
+                    $courselist[ $id ]->fullname = $course->fullname . "(" . $strhasenrollments .")";
                     $this->hasenrollments = true;
                 }
             }
@@ -72,11 +71,41 @@ abstract class company_course_selector_base extends course_selector_base {
                 if ($companygroup = company::get_company_group($this->companyid, $id)) {
                     if ($DB->get_records('groups_members', array('groupid' => $companygroup->id))) {
                         $courselist[ $id ]->hasenrollments = true;
-                        $courselist[ $id ]->fullname = "<span class=\"hasenrollments\">
-                                                        {$course->fullname} ($strsharedhasenrollments)</span>";
+                        $courselist[ $id ]->fullname = $course->fullname . "(" . $strsharedhasenrollments .")";
                         $this->hasenrollments = true;
                     }
                 }
+            }
+        }
+    }
+
+    protected function process_hidden_courses(&$allcourses, $licenserecord = false) {
+        global $CFG, $DB;
+
+        foreach ($allcourses as $id => $course) {
+            $courseid = $id;
+            if ($licenserecord) {
+                $courseid = $DB->get_field('companylicense_users', 'licensecourseid', ['id' => $id]);
+            }
+            if ($DB->get_record('course', ['id' => $courseid, 'visible' => 0])) {
+                $allcourses[$id]->fullname = $course->fullname . "(" . get_string('hidden', 'badges') . ")";
+            }
+        }
+    }
+
+    protected function process_license_allocations(&$licensecourses, $userid) {
+        global $CFG, $DB;
+        foreach ($licensecourses as $id => $course) {
+            if ($DB->get_record_sql("SELECT clu.id FROM {companylicense_users} clu
+                                     JOIN {companylicense} cl
+                                     ON (clu.licenseid = cl.id)
+                                     WHERE clu.userid = :userid
+                                     AND clu.licensecourseid = :licensecourseid
+                                     AND clu.timecompleted IS NULL
+                                     AND clu.isusing = 1
+                                     AND cl.type = 0", array('userid' => $userid,
+                                                              'licensecourseid' => $course->id))) {
+                $licensecourses[$id]->fullname = $course->fullname . '*';
             }
         }
     }
@@ -215,6 +244,7 @@ class current_company_course_selector extends company_course_selector_base {
 
         // Have any of the courses got enrollments?
         $this->process_enrollments($availablecourses);
+        $this->process_hidden_courses($availablecourses);
 
         // Set up empty return.
         $coursearray = array();
@@ -344,6 +374,7 @@ class all_department_course_selector extends company_course_selector_base {
         if (empty($availablecourses) && empty($globalcourses)) {
             return array();
         }
+        $this->process_hidden_courses($availablecourses);
 
         // Set up empty return.
         $coursearray = array();
@@ -504,6 +535,7 @@ class potential_company_course_selector extends company_course_selector_base {
 
         // Have any of the courses got enrollments?
         $this->process_enrollments($availablecourses);
+        $this->process_hidden_courses($availablecourses);
 
         if ($search) {
             $groupname = get_string('potcoursesmatching', 'block_iomad_company_admin', $search);
@@ -626,6 +658,7 @@ class potential_subdepartment_course_selector extends company_course_selector_ba
 
         // Have any of the courses got enrollments?
         $this->process_enrollments($sanitisedcourses);
+        $this->process_hidden_courses($availablecourses);
 
         if ($search) {
             $groupname = get_string('potcoursesmatching', 'block_iomad_company_admin', $search);
@@ -640,7 +673,7 @@ class potential_subdepartment_course_selector extends company_course_selector_ba
 /**
  * Selector for any course
  */
-class any_course_selector extends course_selector_base {
+class any_course_selector extends company_course_selector_base {
     /**
      * Any courses
      * @param <type> $search
@@ -671,6 +704,7 @@ class any_course_selector extends course_selector_base {
         if (empty($availablecourses)) {
             return array();
         }
+        $this->process_hidden_courses($availablecourses);
 
         if ($search) {
             $groupname = get_string('coursesmatching', 'block_iomad_company_admin', $search);
@@ -682,7 +716,7 @@ class any_course_selector extends course_selector_base {
     }
 }
 
-class current_user_course_selector extends course_selector_base {
+class current_user_course_selector extends company_course_selector_base {
     /**
      * Company courses
      * @param <type> $search
@@ -728,6 +762,8 @@ class current_user_course_selector extends course_selector_base {
                     unset($coursearray[$courseid]);
                 }
             }
+            $this->process_hidden_courses($coursearray);
+
             // Deal with any search.
             if (empty($search)) {
                 return array($groupname => $coursearray);
@@ -746,7 +782,7 @@ class current_user_course_selector extends course_selector_base {
     }
 }
 
-class potential_user_course_selector extends course_selector_base {
+class potential_user_course_selector extends company_course_selector_base {
     /**
      * Potential company manager courses
      * @param <type> $search
@@ -892,6 +928,7 @@ class potential_user_course_selector extends course_selector_base {
         if (empty($availablecourses)) {
             return array();
         }
+        $this->process_hidden_courses($availablecourses);
 
         if ($search) {
             $groupname = get_string('potcoursesmatching', 'block_iomad_company_admin', $search);
@@ -903,7 +940,7 @@ class potential_user_course_selector extends course_selector_base {
     }
 }
 
-class current_user_license_course_selector extends course_selector_base {
+class current_user_license_course_selector extends company_course_selector_base {
     /**
      * Company courses
      * @param <type> $search
@@ -932,23 +969,6 @@ class current_user_license_course_selector extends course_selector_base {
         $options['licenses'] = $this->licenses;
         $options['user'] = $this->user;
         return $options;
-    }
-
-    protected function process_license_allocations(&$licensecourses, $userid) {
-        global $CFG, $DB;
-        foreach ($licensecourses as $id => $course) {
-            if ($DB->get_record_sql("SELECT clu.id FROM {companylicense_users} clu
-                                     JOIN {companylicense} cl
-                                     ON (clu.licenseid = cl.id)
-                                     WHERE clu.userid = :userid
-                                     AND clu.licensecourseid = :licensecourseid
-                                     AND clu.timecompleted IS NULL
-                                     AND clu.isusing = 1
-                                     AND cl.type = 0", array('userid' => $userid,
-                                                              'licensecourseid' => $course->id))) {
-                $licensecourses[$id]->fullname = $course->fullname . '*';
-            }
-        }
     }
 
     public function find_courses($search) {
@@ -989,8 +1009,8 @@ class current_user_license_course_selector extends course_selector_base {
         if (empty($availablecourses)) {
             return array();
         }
-
         $this->process_license_allocations($availablecourses, $this->user->id);
+        $this->process_hidden_courses($availablecourses, true);
 
         if ($search) {
             $groupname = get_string('curlicensecoursesmatching', 'block_iomad_company_admin', $search);
@@ -1084,7 +1104,10 @@ class current_user_license_course_selector extends course_selector_base {
         }
 
         // Add some additional sensible conditions.
-        $tests[] = $u . 'visible = 1';
+        if (!iomad::has_capability('moodle/course:viewhiddencourses', context_system::instance()) &&
+            !iomad::has_capability('moodle/course:viewhiddencourses', context_company::instance(iomad::get_my_companyid(context_system::instance())))) {
+            $tests[] = $u . 'visible = 1';
+        }
 
         // If we are being asked to exclude any courses, do that.
         if (!empty($this->exclude)) {
@@ -1111,7 +1134,7 @@ class current_user_license_course_selector extends course_selector_base {
     }
 }
 
-class potential_user_license_course_selector extends course_selector_base {
+class potential_user_license_course_selector extends company_course_selector_base {
     /**
      * Potential company manager courses
      * @param <type> $search
@@ -1182,6 +1205,7 @@ class potential_user_license_course_selector extends course_selector_base {
         if (empty($availablecourses)) {
             return array();
         }
+        $this->process_hidden_courses($availablecourses);
 
         if ($search) {
             $groupname = get_string('potlicensecoursesmatching', 'block_iomad_company_admin', $search);

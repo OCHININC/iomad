@@ -260,27 +260,38 @@ if ($frm and isset($frm->username)) {                             // Login WITH 
 
         // Check if the company in the session is still correct.
         if ($DB->get_manager()->table_exists('company') &&
-            !has_capability('block/iomad_company_admin:company_view_all', context_system::instance()) &&
-            !empty($SESSION->currenteditingcompany)) {
-            $currenteditingcompany = $SESSION->currenteditingcompany;
-            $currentcompany = $SESSION->company;
-            if ($mycompany = company::by_userid($user->id, true)) {
-                if ($currenteditingcompany != $mycompany->id) {
-                    $mycompanyrec = $DB->get_record('company', array('id' => $mycompany->id));
-                    if ($mycompanyrec->hostname != $currentcompany->hostname) {
-                        if (empty($mycompanyrec->hostname)) {
-                            $companyurl = $CFG->wwwroot;
-                        } else {
-                            $companyurl = $_SERVER['REQUEST_SCHEME'] . "://" . $mycompanyrec->hostname;
+            !has_capability('block/iomad_company_admin:company_view_all', context_system::instance())) {
+            $currenteditingcompany = 0;
+            $currentcompany = [];
+            if (!empty($SESSION->currenteditingcompany)) {
+                $currenteditingcompany = $SESSION->currenteditingcompany;
+                $currentcompany = $SESSION->company;
+            }
+            if (empty($currenteditingcompany)  ||
+                !company::check_valid_user($currenteditingcompany, $user->id)) {
+                // Check if the user is in multiple companies.
+                if ($DB->count_records_sql("SELECT COUNT(DISTINCT companyid) FROM {company_users} WHERE userid = :userid", ['userid' => $user->id]) == 1) {
+                    if ($mycompany = company::by_userid($user->id, true)) {
+                        $mycompanyrec = $DB->get_record('company', ['id' => $mycompany->id]);
+                        if ($currenteditingcompany != $mycompany->id) {
+                            if (!empty($currentcompany)) {
+                                $currentcompanyobj = new company($currentcompany->id);
+                                $currentwwwroot = $currentcompanyobj->get_wwwroot();
+                            } else {
+                                $currentwwwroot = $CFG->wwwroot;
+                            }
+                            $mywwwroot = $mycompany->get_wwwroot();
+                            if ($mywwwroot != $currentwwwroot) {
+                                $SESSION->currenteditingcompany = $mycompany->id;
+                                $SESSION->company = $mycompanyrec;
+                                $SESSION->theme = $mycompanyrec->theme;
+
+                                redirect ($mywwwroot);
+                            }
                         }
                     } else {
                         $companyurl = $CFG->wwwroot;
                     }
-                    $SESSION->currenteditingcompany = $mycompany->id;
-                    $SESSION->company = $mycompanyrec;
-                    $SESSION->theme = $mycompanyrec->theme;
-
-                    redirect ($companyurl . '/login/index.php');
                 }
             }
         }
@@ -420,17 +431,6 @@ if (empty($frm->username) && $authsequence[0] != 'shibboleth') {  // See bug 518
     }
 
     $frm->password = "";
-}
-
-// IOMAD - changes to display the instructions.
-if (!empty($CFG->registerauth) or is_enabled_auth('none') or !empty($CFG->auth_instructions)) {
-    if (!empty($CFG->local_iomad_signup_showinstructions)) {
-        $show_instructions = true;
-    } else {
-        $show_instructions = false;
-    }
-} else {
-    $show_instructions = false;
 }
 
 $potentialidps = array();

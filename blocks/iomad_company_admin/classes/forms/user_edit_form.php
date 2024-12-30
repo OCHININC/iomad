@@ -27,6 +27,8 @@ defined('MOODLE_INTERNAL') || die;
 
 use \company;
 use \iomad;
+use core_user;
+use core_text;
 
 //class user_edit_form extends company_moodleform {
 class user_edit_form extends \moodleform {
@@ -340,6 +342,19 @@ class user_edit_form extends \moodleform {
 
         $usernew = (object)$usernew;
 
+        // Check allowed characters. - We only care if we are being passed a username.
+        if (!empty($CFG->iomad_allow_username)) {
+            if (!$usernew->use_email_as_username) {
+                if (empty($usernew->username)) {
+                    $errors['username'] = get_string('required');
+                } else if ($usernew->username !== core_text::strtolower($usernew->username)) {
+                    $errors['username'] = get_string('usernamelowercase');
+                } else if ($usernew->username !== core_user::clean_field($usernew->username, 'username')) {
+                        $errors['username'] = get_string('invalidusername');
+                }
+            }
+        }
+
         // Validate email.
         if (empty($CFG->allowaccountssameemail) &&
             $DB->record_exists('user', array('email' => $usernew->email, 'mnethostid' => $CFG->mnet_localhost_id))) {
@@ -385,6 +400,7 @@ class user_edit_form extends \moodleform {
                 }
             }
         }
+
         return $errors;
     }
 

@@ -590,6 +590,7 @@ class enrol_license_plugin extends enrol_plugin {
 
                 // Tell the system the license is finished with.
                 $license['timecompleted'] = $runtime;
+                $DB->update_record('companylicense_users', $license);
 
                 // Get the grade item details.
                 if ($gradeitems = $DB->get_records_sql("SELECT gg.id, gg.finalgrade, gg.feedback, gi.itemtype

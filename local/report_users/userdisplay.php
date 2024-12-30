@@ -441,7 +441,11 @@ if (iomad::has_capability('block/iomad_company_admin:company_add', $context)) {
     $sqlparams['myuserid'] = $USER->id;
 }
 
-$wheresql = " lit.userid = :userid $companysql AND lit.courseid IN (" . join(',', array_keys($company->get_menu_courses(true))) .") $validsql";
+$companycourses = $company->get_menu_courses(true);
+if (empty($companycourses)) {
+    $companycourses = [0];
+}
+$wheresql = " lit.userid = :userid $companysql AND lit.courseid IN (" . join(',', array_keys($companycourses)) .") $validsql";
 
 // Set up the headers for the form.
 $headers = array(get_string('course', 'local_report_completion'),

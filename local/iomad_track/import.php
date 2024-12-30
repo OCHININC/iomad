@@ -333,6 +333,7 @@ if (!empty($fileimport)) {
             echo $OUTPUT->header();
             $mform->display();
             echo $OUTPUT->footer();
+            die;
         }
     }
 
@@ -443,7 +444,7 @@ class upload_progress_tracker {
         echo '<th class="header c'.$ci++.'" scope="col">'.get_string('dateenrolled', 'local_report_completion').'</th>';
         echo '<th class="header c'.$ci++.'" scope="col">'.get_string('datestarted', 'local_report_completion').'</th>';
         echo '<th class="header c'.$ci++.'" scope="col">'.get_string('datecompleted', 'local_report_completion').'</th>';
-        echo '<th class="header c'.$ci++.'" scope="col">'.get_string('grade').'</th>';
+        echo '<th class="header c'.$ci++.'" scope="col">'.get_string('grade', 'grades').'</th>';
         echo '<th class="header c'.$ci++.'" scope="col">'.get_string('licensename', 'block_iomad_company_admin').'</th>';
         echo '<th class="header c'.$ci++.'" scope="col">'.get_string('licensedateallocated', 'block_iomad_company_admin').'</th>';
         echo '</tr>';
@@ -541,5 +542,3 @@ function validate_uploadcompletion_columns(&$columns) {
 
     return true;
 }
-
-

@@ -96,3 +96,5 @@ $string['notapplicable'] = 'N/A';
 $string['showpercentageusers'] = 'Percentage of company';
 $string['hidepercentageusers'] = 'Total of company';
 $string['beginningoftime'] = 'Beginning of time';
+$string['neverassigned'] = 'Never assigned';
+$string['neverenrolled'] = 'Never enrolled';

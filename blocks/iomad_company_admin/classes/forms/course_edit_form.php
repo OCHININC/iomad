@@ -151,6 +151,11 @@ class course_edit_form extends moodleform {
             }
         }
 
+        // Check start end dates are sensible.
+        if (!empty($data['startdate']) && !empty($data['enddate']) && $data['enddate'] < $data['startdate']) {
+            $errors['startdate'] =  get_string('enddatebeforestartdate', 'error');
+        }
+
         return $errors;
     }
 }

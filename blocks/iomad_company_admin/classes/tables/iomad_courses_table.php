@@ -224,10 +224,25 @@ class iomad_courses_table extends table_sql {
      * @return string HTML content to go inside the td.
      */
     public function col_validlength($row) {
-        global $USER, $systemcontext, $company, $OUTPUT;
+        global $DB, $USER, $systemcontext, $company, $OUTPUT;
+
+        // Is this a course the company manages themselves?
+        $companycreatedcourse = false;
+        // If it's not a license course and it's in the company_created_courses table - then we can do more things with it.
+        if (($row->licensed == 0 || $row->licensed = 3) &&
+            $DB->get_record('company_created_courses', ['companyid' => $company->id, 'courseid' => $row->courseid])) {
+            $companycreatedcourse = true;
+        }
+
+        // Is this a course the company could fully manage?
+        $canbemanaged = false;
+        if (($row->licensed == 0 || $row->licensed ==3) && $row->shared == 0) {
+            $canbemanaged = true;
+        }
 
         if (!empty($USER->editing) &&
-            iomad::has_capability('block/iomad_company_admin:managecourses', $systemcontext)) {
+        (( $canbemanaged || $companycreatedcourse) ||
+            iomad::has_capability('block/iomad_company_admin:manageallcourses', $systemcontext))) {
             $editable = new \block_iomad_company_admin\output\courses_validlength_editable($company,
                                                           $systemcontext,
                                                           $row,
@@ -251,11 +266,25 @@ class iomad_courses_table extends table_sql {
      * @return string HTML content to go inside the td.
      */
     public function col_expireafter($row) {
-        global $USER, $systemcontext, $company, $OUTPUT;
+        global $DB, $USER, $systemcontext, $company, $OUTPUT;
+
+        // Is this a course the company manages themselves?
+        $companycreatedcourse = false;
+        // If it's not a license course and it's in the company_created_courses table - then we can do more things with it.
+        if (($row->licensed == 0 || $row->licensed = 3) &&
+            $DB->get_record('company_created_courses', ['companyid' => $company->id, 'courseid' => $row->courseid])) {
+            $companycreatedcourse = true;
+        }
+
+        // Is this a course the company could fully manage?
+        $canbemanaged = false;
+        if (($row->licensed == 0 || $row->licensed ==3) && $row->shared == 0) {
+            $canbemanaged = true;
+        }
 
         if (!empty($USER->editing) &&
-            iomad::has_capability('block/iomad_company_admin:managecourses', $systemcontext)) {
-
+        (( $canbemanaged || $companycreatedcourse) ||
+            iomad::has_capability('block/iomad_company_admin:manageallcourses', $systemcontext))) {
             $editable = new \block_iomad_company_admin\output\enrolment_expireafter_editable($company,
                                                           $systemcontext,
                                                           $row,
@@ -279,11 +308,25 @@ class iomad_courses_table extends table_sql {
      * @return string HTML content to go inside the td.
      */
     public function col_warnexpire($row) {
-        global $USER, $systemcontext, $company, $OUTPUT;
+        global $DB, $USER, $systemcontext, $company, $OUTPUT;
+
+        // Is this a course the company manages themselves?
+        $companycreatedcourse = false;
+        // If it's not a license course and it's in the company_created_courses table - then we can do more things with it.
+        if (($row->licensed == 0 || $row->licensed = 3) &&
+            $DB->get_record('company_created_courses', ['companyid' => $company->id, 'courseid' => $row->courseid])) {
+            $companycreatedcourse = true;
+        }
+
+        // Is this a course the company could fully manage?
+        $canbemanaged = false;
+        if (($row->licensed == 0 || $row->licensed ==3) && $row->shared == 0) {
+            $canbemanaged = true;
+        }
 
         if (!empty($USER->editing) &&
-            iomad::has_capability('block/iomad_company_admin:managecourses', $systemcontext)) {
-
+        (( $canbemanaged || $companycreatedcourse) ||
+            iomad::has_capability('block/iomad_company_admin:manageallcourses', $systemcontext))) {
             $editable = new \block_iomad_company_admin\output\courses_warnexpire_editable($company,
                                                           $systemcontext,
                                                           $row,
@@ -308,11 +351,25 @@ class iomad_courses_table extends table_sql {
      * @return string HTML content to go inside the td.
      */
     public function col_warnnotstarted($row) {
-        global $USER, $systemcontext, $company, $OUTPUT;
+        global $DB, $USER, $systemcontext, $company, $OUTPUT;
+
+        // Is this a course the company manages themselves?
+        $companycreatedcourse = false;
+        // If it's not a license course and it's in the company_created_courses table - then we can do more things with it.
+        if (($row->licensed == 0 || $row->licensed = 3) &&
+            $DB->get_record('company_created_courses', ['companyid' => $company->id, 'courseid' => $row->courseid])) {
+            $companycreatedcourse = true;
+        }
+
+        // Is this a course the company could fully manage?
+        $canbemanaged = false;
+        if (($row->licensed == 0 || $row->licensed ==3) && $row->shared == 0) {
+            $canbemanaged = true;
+        }
 
         if (!empty($USER->editing) &&
-            iomad::has_capability('block/iomad_company_admin:managecourses', $systemcontext)) {
-
+        (( $canbemanaged || $companycreatedcourse) ||
+            iomad::has_capability('block/iomad_company_admin:manageallcourses', $systemcontext))) {
             $editable = new \block_iomad_company_admin\output\courses_warnnotstarted_editable($company,
                                                           $systemcontext,
                                                           $row,
@@ -336,11 +393,25 @@ class iomad_courses_table extends table_sql {
      * @return string HTML content to go inside the td.
      */
     public function col_warncompletion($row) {
-        global $USER, $systemcontext, $company, $OUTPUT;
+        global $DB, $USER, $systemcontext, $company, $OUTPUT;
+
+        // Is this a course the company manages themselves?
+        $companycreatedcourse = false;
+        // If it's not a license course and it's in the company_created_courses table - then we can do more things with it.
+        if (($row->licensed == 0 || $row->licensed = 3) &&
+            $DB->get_record('company_created_courses', ['companyid' => $company->id, 'courseid' => $row->courseid])) {
+            $companycreatedcourse = true;
+        }
+
+        // Is this a course the company could fully manage?
+        $canbemanaged = false;
+        if (($row->licensed == 0 || $row->licensed ==3) && $row->shared == 0) {
+            $canbemanaged = true;
+        }
 
         if (!empty($USER->editing) &&
-            iomad::has_capability('block/iomad_company_admin:managecourses', $systemcontext)) {
-
+        (( $canbemanaged || $companycreatedcourse) ||
+            iomad::has_capability('block/iomad_company_admin:manageallcourses', $systemcontext))) {
             $editable = new \block_iomad_company_admin\output\courses_warncompletion_editable($company,
                                                           $systemcontext,
                                                           $row,
@@ -364,11 +435,25 @@ class iomad_courses_table extends table_sql {
      * @return string HTML content to go inside the td.
      */
     public function col_notifyperiod($row) {
-        global $USER, $systemcontext, $company, $OUTPUT;
+        global $DB, $USER, $systemcontext, $company, $OUTPUT;
+
+        // Is this a course the company manages themselves?
+        $companycreatedcourse = false;
+        // If it's not a license course and it's in the company_created_courses table - then we can do more things with it.
+        if (($row->licensed == 0 || $row->licensed = 3) &&
+            $DB->get_record('company_created_courses', ['companyid' => $company->id, 'courseid' => $row->courseid])) {
+            $companycreatedcourse = true;
+        }
+
+        // Is this a course the company could fully manage?
+        $canbemanaged = false;
+        if (($row->licensed == 0 || $row->licensed ==3) && $row->shared == 0) {
+            $canbemanaged = true;
+        }
 
         if (!empty($USER->editing) &&
-            iomad::has_capability('block/iomad_company_admin:managecourses', $systemcontext)) {
-
+        (( $canbemanaged || $companycreatedcourse) ||
+            iomad::has_capability('block/iomad_company_admin:manageallcourses', $systemcontext))) {
             $editable = new \block_iomad_company_admin\output\courses_notifyperiod_editable($company,
                                                           $systemcontext,
                                                           $row,
@@ -392,10 +477,25 @@ class iomad_courses_table extends table_sql {
      * @return string HTML content to go inside the td.
      */
     public function col_hasgrade($row) {
-        global $USER, $systemcontext, $company, $OUTPUT;
+        global $DB, $USER, $systemcontext, $company, $OUTPUT;
+
+        // Is this a course the company manages themselves?
+        $companycreatedcourse = false;
+        // If it's not a license course and it's in the company_created_courses table - then we can do more things with it.
+        if (($row->licensed == 0 || $row->licensed = 3) &&
+            $DB->get_record('company_created_courses', ['companyid' => $company->id, 'courseid' => $row->courseid])) {
+            $companycreatedcourse = true;
+        }
+
+        // Is this a course the company could fully manage?
+        $canbemanaged = false;
+        if (($row->licensed == 0 || $row->licensed ==3) && $row->shared == 0) {
+            $canbemanaged = true;
+        }
 
         if (!empty($USER->editing) &&
-            iomad::has_capability('block/iomad_company_admin:managecourses', $systemcontext)) {
+        (( $canbemanaged || $companycreatedcourse) ||
+            iomad::has_capability('block/iomad_company_admin:manageallcourses', $systemcontext))) {
             $editable = new \block_iomad_company_admin\output\courses_hasgrade_editable($company,
                                                           $systemcontext,
                                                           $row,
@@ -431,15 +531,12 @@ class iomad_courses_table extends table_sql {
     public function col_coursevisibility($row) {
         global $output;
         
-        if(empty($USER->editing)) {
-        
-            if($row->visible == 0) {        
-                $visiblereturn = "<span class=\"dimmed_text\"><i class='icon fa fa-eye-slash fa-fw ' title='" . get_string('hidden', 'badges') . "' role='img' aria-label='" . get_string('hidden', 'badges') . "'></i></span>";
-            } elseif($row->visible == 1) {
-        	       $visiblereturn = "<i class='icon fa fa-eye fa-fw ' title='" . get_string('visible', 'badges') . "' role='img' aria-label='" . get_string('visible', 'badges') . "'></i>";
-            }   
-            
+        if ($row->visible == 0) {        
+            $visiblereturn = "<span class=\"dimmed_text\"><i class='icon fa fa-eye-slash fa-fw ' title='" . get_string('hidden', 'badges') . "' role='img' aria-label='" . get_string('hidden', 'badges') . "'></i></span>";
+        } elseif($row->visible == 1) {
+            $visiblereturn = "<i class='icon fa fa-eye fa-fw ' title='" . get_string('visible', 'badges') . "' role='img' aria-label='" . get_string('visible', 'badges') . "'></i>";
         }   
+            
         
         return $visiblereturn;
 

@@ -92,7 +92,7 @@ class company_license_expiring_task extends \core\task\scheduled_task {
             }
         }
 
-        mtrace("email reporting training event not selected completed at " . date('d M Y h:i:s', time()));
+        mtrace("email report company license expiring task completed at " . date('d M Y h:i:s', time()));
     }
 
 }

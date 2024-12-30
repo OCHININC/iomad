@@ -71,17 +71,35 @@ function local_iomad_signup_user_created($user) {
 
         // Get context
         $context = context_system::instance();
+        $found = false;
 
-        // Check if we have a domain already for this users email address.
-        list($dump, $emaildomain) = explode('@', $user->email);
-        if ($domaininfo = $DB->get_record_sql("SELECT * FROM {company_domains} WHERE " . $DB->sql_compare_text('domain') . " = '" . $DB->sql_compare_text($emaildomain)."'")) {
+        // check if we have a company id from the URL or SESSION.
+        $companyid = iomad::get_my_companyid($context, false);
+        if (!empty($companyid)) {
+            $company = new company($companyid);
+            $found = true;
+        }
+
+        if (!$found) {
+            // Check if we have a domain already for this users email address.
+            list($dump, $emaildomain) = explode('@', $user->email);
+            if ($domaininfo = $DB->get_record_sql("SELECT * FROM {company_domains} WHERE " . $DB->sql_compare_text('domain') . " = '" . $DB->sql_compare_text($emaildomain)."'")) {
+                // Get company.
+                $company = new company($domaininfo->companyid);
+                $found = true;
+            }
+        }
+        if (!$found && !empty($CFG->local_iomad_signup_company)) {
+            // Do we have a default company to assign?
             // Get company.
-            $company = new company($domaininfo->companyid);
-
+            $company = new company($CFG->local_iomad_signup_company);
+            $found = true;
+        }
+        if ($found) {
             // Get the full user information for department matching.
             profile_load_data($user);
 
-            // Do we have a company departmet profile field?
+            // Do we have a company department profile field?
             $autodepartmentid = $company->get_auto_department($user);
 
             // assign the user to the company.
@@ -94,31 +112,6 @@ function local_iomad_signup_user_created($user) {
             }
 
             $DB->update_record('user', $user);
-            profile_save_data($user);
-
-            // Force the company theme in case it's not already been done.
-            $DB->set_field('user', 'theme', $company->get_theme(), array('id' => $user->id));
-        } else if (!empty($CFG->local_iomad_signup_company)) {
-            // Do we have a company to assign?
-            // Get company.
-            $company = new company($CFG->local_iomad_signup_company);
-
-            // Get the full user information for department matching.
-            profile_load_data($user);
-
-            // Do we have a company departmet profile field?
-            $autodepartmentid = $company->get_auto_department($user);
-
-            // assign the user to the company.
-            $company->assign_user_to_company($user->id, $autodepartmentid);
-
-            // Deal with company defaults
-            $defaults = $company->get_user_defaults();
-            foreach ($defaults as $index => $value) {
-                $user->$index = $value;
-            }
-
-	        $DB->update_record('user', $user);
             profile_save_data($user);
 
             // Force the company theme in case it's not already been done.

@@ -470,7 +470,9 @@ abstract class course_selector_base {
         }
 
         // Add some additional sensible conditions.
-        $tests[] = $u . 'visible = 1';
+        if (!iomad::has_capability('moodle/course:viewhiddencourses', context_system::instance())) {
+            $tests[] = $u . 'visible = 1';
+        }
 
         // If we are being asked to exclude any courses, do that.
         if (!empty($this->exclude)) {

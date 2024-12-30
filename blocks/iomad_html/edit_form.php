@@ -53,7 +53,7 @@ class block_iomad_html_edit_form extends block_edit_form {
         if (iomad::has_capability('block/iomad_company_admin:company_add', context_system::instance())) {
             // Deal with the companies
             $companylist = company::get_companies_select(false);
-            $companyselect = $mform->addElement('select', 'config_companies', get_string('selectacompany', 'block_iomad_company_selector'), $companylist);
+            $companyselect = $mform->addElement('autocomplete', 'config_companies', get_string('selectacompany', 'block_iomad_company_selector'), $companylist);
             $companyselect->setMultiple(true);
         }
     }

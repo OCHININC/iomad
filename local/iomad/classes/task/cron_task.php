@@ -128,7 +128,7 @@ class cron_task extends \core\task\scheduled_task {
 
         // Clear users from courses where the license has expired and the option is chosen
         mtrace ("Clear users from courses where the license has expired and the option is chosen");
-        if ($userlicenses = $DB->get_records_sql("SELECT clu.* FROM {companylicense_users} clu
+        if ($userlicenses = $DB->get_records_sql("SELECT clu.*,cl.type FROM {companylicense_users} clu
                                                   JOIN {companylicense} cl on (clu.licenseid = cl.id)
                                                   WHERE cl.clearonexpire = 1
                                                   AND cl.cutoffdate < :time
@@ -137,7 +137,24 @@ class cron_task extends \core\task\scheduled_task {
             foreach ($userlicenses as $userlicense) {
                 mtrace("Clearing userid $userlicense->userid from courseid $userlicense->licensecourseid");
                 if ($userlicense->isusing == 1) {
-                    \company_user::delete_user_course($userlicense->userid, $userlicense->licensecourseid, 'autodelete');
+                    // Get the corresponding entry from the LIT table.
+                    if ($litrecs = $DB->get_records_select('local_iomad_track',
+                                                           '*',
+                                                           'userid = :userid
+                                                            AND courseid = :courseid
+                                                            AND licenseid =: licenseid
+                                                            AND timecompleted IS NULL',
+                                                           ['userid' => $userlicense->userid,
+                                                            'courseid' => $userlicense->licensecourseid,
+                                                            'licenseid' => $userlicense->licenseid])) {
+                        foreach ($litrecs as $litrec) {
+                            \company_user::delete_user_course($userlicense->userid, $userlicense->licensecourseid, 'autodelete', $litrec->id);
+                        }
+                    }
+                    // If this is a re-usable license we want to dump the allocation record too.
+                    if ($userlicense->type == 1 || $userlicense->type ==3) {
+                        $DB->delete_records('companylicense_users', ['id' => $userlicense->id]);
+                    }
                 } else {
                     $DB->delete_records('companylicense_users', array('id' => $userlicense->id));
 

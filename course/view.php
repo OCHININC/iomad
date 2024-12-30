@@ -35,7 +35,7 @@
     // Iomad - check if a user can even see the course.
     if (!iomad::iomad_check_course($id)) {
         // Set it to 0 so it fails DB get_record.
-        $params['id'] = 0;
+        $params['id'] = SITEID;
     }
 
     $course = $DB->get_record('course', $params, '*', MUST_EXIST);

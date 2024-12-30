@@ -686,11 +686,15 @@ if (empty($courseid)) {
 
     // Deal with any course searches.
     $searchparams = array();
+    $companycourses = $company->get_menu_courses(true);
+    if (empty($companycourses)) {
+        $companycourses = [0];
+    }
     if (!empty($coursesearch)) {
-        $coursesearchsql = " AND courseid IN (" . join(',', array_keys($company->get_menu_courses(true))) . ") AND " . $DB->sql_like('coursename', ':coursename', false, false);
+        $coursesearchsql = " AND lit.courseid IN (" . join(',', array_keys($companycourses)) . ") AND " . $DB->sql_like('lit.coursename', ':coursename', false, false);
         $searchparams['coursename'] = "%" . $coursesearch . "%";
     } else {
-        $coursesearchsql = " AND courseid IN (" . join(',', array_keys($company->get_menu_courses(true))) . ") ";
+        $coursesearchsql = " AND lit.courseid IN (" . join(',', array_keys($companycourses)) . ") ";
     }
 
     // Deal with any custom field searches.
@@ -720,24 +724,24 @@ if (empty($courseid)) {
         if (empty($fieldcourseids)) {
             $fieldcourseids[0] = "We didn't find any courses";
         }
-        $coursesearchsql .= " AND courseid IN (" . join(',', array_keys($fieldcourseids)) . ")"; 
+        $coursesearchsql .= " AND lit.courseid IN (" . join(',', array_keys($fieldcourseids)) . ")"; 
     }
 
     // Set up the SQL for the table.
-    $selectsql = "courseid as id, coursename, $departmentid AS departmentid, $showsuspended AS showsuspended, companyid";
-    $fromsql = "{local_iomad_track}";
+    $selectsql = "lit.courseid AS id, lit.coursename AS coursename, $departmentid AS departmentid, $showsuspended AS showsuspended, lit.companyid AS companyid, ic.licensed AS islicensed";
+    $fromsql = "{local_iomad_track} lit JOIN {iomad_courses} ic ON (lit.courseid = ic.courseid)";
     $sqlparams = array('companyid' => $companyid) + $searchparams;
 
-    $wheresql = "companyid = :companyid $coursesearchsql group by courseid, coursename, companyid";
+    $wheresql = "lit.companyid = :companyid $coursesearchsql GROUP BY lit.courseid, lit.coursename, lit.companyid, ic.licensed";
 
     // Set up the headers.
     $courseheaders = [get_string('coursename', 'local_report_completion')];
     $coursecolumns = ['coursename'];
 
     // Set up the rest of the headers for the table.
-    $haslicenses = !empty($DB->count_records_sql("SELECT COUNT(id)
-                                                  FROM {local_iomad_track}
-                                                  WHERE courseid IN (
+    $haslicenses = !empty($DB->count_records_sql("SELECT COUNT(lit.id)
+                                                  FROM {local_iomad_track} lit
+                                                  WHERE lit.courseid IN (
                                                      SELECT courseid FROM {iomad_courses}
                                                      WHERE licensed = 1)
                                                   $coursesearchsql",
@@ -746,26 +750,31 @@ if (empty($courseid)) {
         $haslicenses) {
         if ($showcharts) {
             $courseheaders[] = get_string('licenseallocated', 'local_report_user_license_allocations');
-            $courseheaders[] = get_string('usersummary', 'local_report_completion');
             $coursecolumns[] = 'licenseallocated';
-            $coursecolumns[] = 'usersummary';
         } else {
-            $courseheaders[] = get_string('licenseallocated', 'local_report_user_license_allocations');
-            $courseheaders[] = get_string('licenseused', 'block_iomad_company_admin');
-            $coursecolumns[] = 'licenseuserallocated';
+            $courseheaders[] = get_string('licenseuserinuse', 'block_iomad_company_admin');
+            $courseheaders[] = get_string('licensedateallocated', 'block_iomad_company_admin');
             $coursecolumns[] = 'licenseuserused';
+            $coursecolumns[] = 'licenseunused';
+            if ($params['showpercentage'] == 1) {
+                $courseheaders[] = get_string('neverassigned', 'local_report_completion');
+                $coursecolumns[] = 'neverassigned';
+            }
         }
+    }
+    if ($showcharts) {
+        $courseheaders[] = get_string('usersummary', 'local_report_completion');
+        $coursecolumns[] = 'usersummary';
     } else {
-        if ($showcharts) {
-            $courseheaders[] = get_string('usersummary', 'local_report_completion');
-            $coursecolumns[] = 'usersummary';
-        } else {
-            $courseheaders[] = get_string('started', 'question');
-            $courseheaders[] = get_string('inprogressusers', 'local_report_completion');
-            $courseheaders[] = get_string('completedusers', 'local_report_completion');
-            $coursecolumns[] = 'userstarted';
-            $coursecolumns[] = 'userinprogress';
-            $coursecolumns[] = 'usercompleted';
+        $courseheaders[] = get_string('notstartedusers', 'local_report_completion');
+        $courseheaders[] = get_string('inprogressusers', 'local_report_completion');
+        $courseheaders[] = get_string('completedusers', 'local_report_completion');
+        $coursecolumns[] = 'usernotstarted';
+        $coursecolumns[] = 'userinprogress';
+        $coursecolumns[] = 'usercompleted';
+        if ($params['showpercentage'] == 1) {
+            $courseheaders[] = get_string('neverenrolled', 'local_report_completion');
+            $coursecolumns[] = 'neverenrolled';
         }
     }
 
@@ -824,8 +833,6 @@ if (empty($courseid)) {
     $gradeheaders = [];
     $gradecolumns = [];
     $completionids = [];
-    $completionsqlfrom = "";
-    $completionsqlselect = "";
 
     // Get the completion information if we need it.
     if ($table->is_downloading() && $courseid != 1 && $CFG->iomad_downloaddetails) {
@@ -839,7 +846,7 @@ if (empty($courseid)) {
                 $modinfo = get_coursemodule_from_id('', $completioncrit->moduleinstance);
                 
                 $completionheaders[$completioncrit->id] = format_string($completioncrit->get_title() . " " . $modinfo->name);
-                $gradeheaders[$completioncrit->id] = format_string(get_string('grade') . " " . $modinfo->name);
+                $gradeheaders[$completioncrit->id] = format_string(get_string('grade', 'grades') . " " . $modinfo->name);
                 $completioncolumns[$completioncrit->id] = "criteria_" . $completioncrit->id;
                 $gradecolumns[$completioncrit->id] = "grade_" . $completioncrit->id;
                 $completionids[] = $completioncrit->id;
@@ -871,7 +878,11 @@ if (empty($courseid)) {
     if ($courseid != 1) {
         $coursesql = " AND lit.courseid = :courseid ";
     } else {
-        $coursesql = " AND lit.courseid IN (" . join(',', array_keys($company->get_menu_courses(true))) . ") ";
+    $companycourses = $company->get_menu_courses(true);
+    if (empty($companycourses)) {
+        $companycourses = [0];
+    }
+        $coursesql = " AND lit.courseid IN (" . join(',', array_keys($companycourses)) . ") ";
     }
 
     // Deal with any search dates.
@@ -895,6 +906,11 @@ if (empty($courseid)) {
         $validsql = "";
     }
 
+    // Deal with suspended switch.
+    $suspendedsql = " AND u.suspended = 0";
+    if ($showsuspended) {
+        $suspendedsql = "";
+    }
     // Set up the initial SQL for the form.
     $userfields = \core_user\fields::for_name()->with_identity($systemcontext)->excluding('id', 'deleted');
     $fieldsql = $userfields->get_sql('u');
@@ -914,10 +930,20 @@ if (empty($courseid)) {
                   lit.licenseallocated,
                   lit.companyid,
                   lit.coursecleared,
-                  lit.modifiedtime
-                  {$fieldsql->selects} $completionsqlselect";
-    $fromsql = "{user} u JOIN {local_iomad_track} lit ON (u.id = lit.userid) JOIN {company_users} cu ON (u.id = cu.userid AND lit.userid = cu.userid AND lit.companyid = cu.companyid) JOIN {department} d ON (cu.departmentid = d.id) $completionsqlfrom";
-    $wheresql = $searchinfo->sqlsearch . " AND 1=1 $departmentsql $companysql $datesql $coursesql $validsql";
+                  lit.modifiedtime,
+                  ic.licensed AS islicensed
+                  {$fieldsql->selects}";
+
+    $educatorsql = " AND cu.educator = 0";
+    if ($DB->get_record('iomad_courses', ['courseid' => $courseid, 'licensed' => 1])) {
+        $educatorsql = " AND lit.licenseid NOT IN (SELECT id FROM {companylicense} WHERE type IN (2,3))";
+    }
+    $fromsql = "{user} u
+                JOIN {local_iomad_track} lit ON (u.id = lit.userid)
+                JOIN {company_users} cu ON (u.id = cu.userid AND lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                JOIN {department} d ON (cu.departmentid = d.id)
+                JOIN {iomad_courses} ic ON (lit.courseid = ic.courseid)";
+    $wheresql = $searchinfo->sqlsearch . " AND u.deleted = 0 $suspendedsql $educatorsql $departmentsql $companysql $datesql $coursesql $validsql";
     $sqlparams = $sqlparams + $searchinfo->searchparams;
 
     // Are we showing this rolled up?
@@ -1055,28 +1081,50 @@ if (empty($courseid)) {
 
     $total = $DB->count_records_sql("SELECT count(DISTINCT lit.id) FROM $fromsql WHERE $wheresql", $sqlparams);
     $totalcompleted = $DB->count_records_sql("SELECT count(DISTINCT lit.id) FROM $fromsql WHERE lit.timecompleted > 0 AND $wheresql", $sqlparams);
-    $totalstarted = $DB->count_records_sql("SELECT count(DISTINCT lit.id) FROM $fromsql WHERE lit.timecompleted > 0 AND $wheresql", $sqlparams);
+    $totalstarted = $DB->count_records_sql("SELECT count(DISTINCT lit.id) FROM $fromsql WHERE lit.timeenrolled > 0 AND $wheresql", $sqlparams);
+    $totalstring = $total;
+    $totalcompletedstring = $totalcompleted;
+    $totalstartedstring = $totalstarted;
 
     if ($showpercentage == 2) {
-        if (!empty($total)) {
-            $totalstarted = get_string('percents','moodle', number_format($totalstarted * 100 / $total,2 )); 
-            $totalcompleted = get_string('percents', 'moodle', number_format($totalcompleted * 100 / $total, 2));
-        } 
+        $totalstarted = !empty($total) ? number_format($totalstarted * 100 / $total,2 ) : 0; 
+        $totalstartedstring = get_string('percents','moodle', $totalstarted); 
+        $totalcompleted = !empty($total) ? number_format($totalcompleted * 100 / $total, 2) : 0;
+        $totalcompletedstring = get_string('percents', 'moodle', $totalcompleted);
     } else if ($showpercentage == 1) {
         $totalcompanyusers = $DB->count_records_sql("SELECT count(DISTINCT lit.userid) FROM {company_users} lit
                                                      JOIN {user} u ON (lit.userid = u.id)
                                                      JOIN {department} d ON (lit.departmentid = d.id)
-                                                     WHERE 1=1 $companysql $departmentsql",
+                                                     JOIN {company_users} cu ON (u.id = cu.userid
+                                                                                 AND lit.userid = cu.userid
+                                                                                 AND d.id = cu.departmentid
+                                                                                 AND lit.companyid = cu.companyid
+                                                                                 AND d.company = cu.companyid)
+                                                     WHERE u.deleted=0 $suspendedsql $educatorsql $companysql $departmentsql",
                                                      $sqlparams);
-        if (!empty($total)) {
-            $total = get_string('percents','moodle', number_format($total * 100 / $totalcompanyusers, 2)); 
-            $totalstarted = get_string('percents','moodle', number_format($totalstarted * 100 / $totalcompanyusers, 2)); 
-            $totalcompleted = get_string('percents', 'moodle', number_format($totalcompleted * 100 / $totalcompanyusers, 2));
-        }
-        
+            $total = !empty($totalcompanyusers) ? number_format($total * 100 / $totalcompanyusers, 2) : 0;
+            $totalstring = get_string('percents','moodle', $total); 
+            $totalstarted = !empty($totalcompanyusers) ? number_format($totalstarted * 100 / $totalcompanyusers, 2) : 0; 
+            $totalstartedstring = get_string('percents','moodle', $totalstarted); 
+            $totalcompleted = !empty($totalcompanyusers) ? number_format($totalcompleted * 100 / $totalcompanyusers, 2) : 0;
+            $totalcompletedstring = get_string('percents', 'moodle', $totalcompleted);
+            $remainder = $totalcompanyusers - $total - $totalstarted - $totalcompleted;
+            $remainder = !empty($totalcompanyusers) ? number_format($remainder * 100 / $totalcompanyusers, 2) : 0;
+            $remainderstring = get_string('percents', 'moodle', $remainder);
     }
-    $summarystring = get_string('usercoursetotal', 'block_iomad_company_admin', (object) ['total' => $total, 'totalstarted' => $totalstarted, 'totalcompleted' => $totalcompleted]);
-    $buttons = $summarystring . "&nbsp $buttons";
+    if ($params['showpercentage'] != 1) {
+        $summarystring = get_string('usercoursetotal', 'block_iomad_company_admin',
+                                    (object) ['total' => $totalstring,
+                                              'totalstarted' => $totalstartedstring,
+                                              'totalcompleted' => $totalcompletedstring]);
+    } else {
+        $summarystring = get_string('usercoursetotalcompany', 'block_iomad_company_admin',
+                                    (object) ['total' => $totalstring,
+                                              'totalstarted' => $totalstartedstring,
+                                              'totalcompleted' => $totalcompletedstring,
+                                              'remainder' => $remainderstring]);
+    }
+    $buttons = "<span class='coursestats'>" . $summarystring . "</span>$buttons";
     $PAGE->set_button($buttons);
 
     if (!$table->is_downloading()) {

@@ -261,7 +261,6 @@ $strpassword = get_string('resetpassword', 'block_iomad_company_admin');
 $strpasswordcheck = get_string('resetpasswordcheck', 'block_iomad_company_admin');
 $strunsuspend = get_string('unsuspend', 'block_iomad_company_admin');
 $strunsuspendcheck = get_string('unsuspendcheck', 'block_iomad_company_admin');
-$strshowallusers = get_string('showallusers');
 $strenrolment = get_string('userenrolments', 'block_iomad_company_admin');
 $struserlicense = get_string('userlicenses', 'block_iomad_company_admin');
 $strshowall = get_string('showallcompanies', 'block_iomad_company_admin');

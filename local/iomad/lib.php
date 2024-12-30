@@ -59,7 +59,6 @@ function local_iomad_pre_course_delete($course) {
             $DB->delete_records('companylicense', array('id' => $courselicense->licenseid));
         }
     }
-    echo $OUTPUT->notification(get_string('removelicenses', 'local_iomad'), 'notifysuccess');
 
     return true;
 }

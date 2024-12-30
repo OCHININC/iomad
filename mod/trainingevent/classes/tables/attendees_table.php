@@ -73,6 +73,7 @@ class attendees_table extends table_sql {
                                                        $eventselect,
                                                        $event->id);
             $select->formid = 'chooseevent'.$row->id;
+            $select->attributes = ['onchange' => 'this.form.submit()']; 
             return html_writer::tag('div',
                                     $OUTPUT->render($select),
                                     ['id' => 'iomad_event_selector']);

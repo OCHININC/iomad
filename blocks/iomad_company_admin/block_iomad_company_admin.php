@@ -99,6 +99,12 @@ class block_iomad_company_admin extends block_base {
                 $SESSION->currenteditingcompany = $firstcompany->id;
                 $company = $firstcompany->id;
             }
+        } else {
+            if (!empty($SESSION->currenteditingcompany)) {
+              $company = $SESSION->currenteditingcompany;
+            } else {
+                $company = (object) [];
+            }
         }
     }
 

@@ -42,7 +42,7 @@ class course_table extends table_sql {
      * @return string HTML content to go inside the td.
      */
     public function col_coursename($row) {
-        global $output, $params, $haslicenses;
+        global $output, $params, $haslicenses, $companycontext;
 
         if (!$this->is_downloading()) {
             $params['courseid'] = $row->id;
@@ -51,17 +51,16 @@ class course_table extends table_sql {
             $coursemonthlylink = new moodle_url('/local/report_completion_monthly/index.php', $params);
             $courselicenselink = new moodle_url('/local/report_user_license_allocations/index.php', $params);
             $cell = html_writer::tag('h2', format_string($row->coursename, true, 1));
-            $systemcontext = context_system::instance();
-            if (iomad::has_capability('local/report_users:view', $systemcontext)) {
+            if (iomad::has_capability('local/report_users:view', $companycontext)) {
                 $cell .= $output->single_button($courseuserslink, get_string('usersummary', 'local_report_completion'));
             }
-            if (iomad::has_capability('local/report_completion_monthly:view', $systemcontext)) {
+            if (iomad::has_capability('local/report_completion_monthly:view', $companycontext)) {
                 if (!empty($cell)) {
                     $cell .= "<br>";
                 }
                 $cell .= $output->single_button($coursemonthlylink, get_string('pluginname', 'local_report_completion_monthly'));
             }
-            if (iomad::has_capability('local/report_user_license_allocations:view', $systemcontext) && $haslicenses) {
+            if (iomad::has_capability('local/report_user_license_allocations:view', $companycontext) && $haslicenses) {
                 if (!empty($cell)) {
                     $cell .= "<br>";
                 }
@@ -82,209 +81,175 @@ class course_table extends table_sql {
     public function col_licenseallocated($row) {
         global $output, $CFG, $DB, $params, $childcompanies;
 
+        // Set some defaults
+        if (!empty($row->islicensed)) {
+            $userfilter = " AND lit.licenseid NOT IN (SELECT id FROM {companylicense} WHERE type IN (2,3))";
+        } else {
+            $userfilter = " AND cu.educator = 0";
+        }
+        $companyuserfilter ="";
+        $departmentsql ="";
+        $cucompanysql = "cu.companyid = :companyid";
+        $litcompanysql = "lit.companyid = :companyid";
+        $runtime = time();
+
         // Deal with expired results.
-        if (empty($params['showhistoric'])) {
+        if (!empty($params['validonly'])) {
             $expiredsql = " AND (lit.timeexpires > :runtime or (lit.timecompleted IS NULL) or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
         } else {
             $expiredsql = "";
         }
 
-        // Get the company details.
-        $company = new company($row->companyid);
+        $sqlparams = ['companyid' => $row->companyid,
+                      'courseid' => $row->id,
+                      'runtime' => $runtime];
 
         // Is this rolled up or not?
         if (!$params['showsummary'] || empty($childcompanies)) {
+            // Get the company details.
+            $company = new company($row->companyid);
             $parentcompanies = $company->get_parent_companies_recursive();
-    
+
             // Deal with parent company managers
             if (!empty($parentcompanies)) {
-                $userfilter = " AND userid NOT IN (
-                                 SELECT userid FROM {company_users}
-                                 WHERE companyid IN (" . implode(',', array_keys($parentcompanies)) . "))";
-            } else {
-                $userfilter = "";
+                $companyuserfilter = " AND cu.userid NOT IN (
+                                       SELECT userid FROM {company_users}
+                                       WHERE companyid IN (" . implode(',', array_keys($parentcompanies)) . "))";
+                $userfilter .= $companyuserfilter;
             }
-    
+
             // Deal with department tree.
             $alldepartments = company::get_all_subdepartments($row->departmentid);
             $departmentsql = " AND cu.departmentid IN (" . join(",", array_keys($alldepartments)) . ") ";
-    
-            // Deal with suspended or not.
-            if (empty($row->showsuspended)) {
-                $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0 ";
-            } else {
-                $suspendedsql = "AND u.deleted = 0 ";
-            }
-    
-            // Are we showing as a % of all users?
-            if ($params['showpercentage'] == 1) {
-                $totalusers = $DB->count_records_sql("SELECT count(cu.id)
-                                                      FROM {company_users} cu
-                                                      JOIN {user} u ON (cu.userid = u.id)
-                                                      WHERE cu.companyid = :companyid
-                                                      $departmentsql
-                                                      $userfilter
-                                                      $suspendedsql",
-                                                      array('companyid' => $company->id));
-            } else if ($params['showpercentage'] == 2) {
-                $totalusers = $DB->count_records_sql("SELECT count(DISTINCT lit.userid)
-                                                      FROM {local_iomad_track} lit
-                                                      JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                                      JOIN {department} d ON (cu.departmentid = d.id)
-                                                      JOIN {user} u ON (lit.userid = u.id AND cu.userid=u.id)
-                                                      WHERE lit.courseid = :courseid
-                                                      $expiredsql
-                                                      $userfilter
-                                                      $suspendedsql
-                                                      $departmentsql",
-                                                      ['courseid' => $row->id,
-                                                      'runtime' => time()]);
-            }
-    
-            // Deal with any search dates.
-            $datesql = "";
-            $sqlparams = array('companyid' => $company->id, 'courseid' => $row->id);
-            if (!empty($params['from'])) {
-                $datesql = " AND (lit.licenseallocated > :enrolledfrom) ";
-                $sqlparams['enrolledfrom'] = $params['from'];
-                $sqlparams['completedfrom'] = $params['from'];
-            }
-            if (!empty($params['to'])) {
-                $datesql .= " AND (lit.licenseallocated < :enrolledto) ";
-                $sqlparams['enrolledto'] = $params['to'];
-                $sqlparams['completedto'] = $params['to'];
-            }
-
-            // Count the unused licenses.
-            $licensesunused = $DB->count_records_sql("SELECT COUNT(DISTINCT lit.id)
-                                                      FROM {local_iomad_track} lit
-                                                      JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                                      JOIN {user} u ON (lit.userid = u.id)
-                                                      WHERE lit.companyid = :companyid
-                                                      AND lit.courseid = :courseid
-                                                      AND lit.licenseallocated IS NOT NULL
-                                                      AND lit.timeenrolled IS NULL
-                                                      $datesql
-                                                      $suspendedsql
-                                                      $departmentsql",
-                                                      $sqlparams);
-
-            // Count the allocated licenses.
-            $licensesallocated = $DB->count_records_sql("SELECT count(DISTINCT lit.id) FROM {local_iomad_track} lit
-                                                         JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                                         JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
-                                                         WHERE lit.courseid = :courseid
-                                                         AND lit.companyid = :companyid
-                                                         AND lit.licenseallocated IS NOT NULL
-                                                         AND lit.timeenrolled IS NOT NULL
-                                                         $datesql
-                                                         $suspendedsql
-                                                         $departmentsql",
-                                                         $sqlparams);
         } else {
-            // Deal with suspended or not.
-            if (empty($row->showsuspended)) {
-                $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0";
-            } else {
-                $suspendedsql = " AND u.deleted = 0";
-            }
-
             $cucompanysql = " cu.companyid IN (" . implode(',', array_keys($childcompanies)) .")";
             $litcompanysql = " lit.companyid IN (" . implode(',', array_keys($childcompanies)) .")";
-
-            // Are we showing as a % of all users?
-            if ($params['showpercentage'] == 1) {
-                $totalusers = $DB->count_records_sql("SELECT count(cu.id)
-                                                      FROM {company_users} cu
-                                                      JOIN {user} u ON (cu.userid = u.id)
-                                                      WHERE $cucompanysql
-                                                      $userfilter
-                                                      $suspendedsql");
-            } else if ($params['showpercentage'] == 2) {
-                $totalusers = $DB->count_records_sql("SELECT count(DISTINCT lit.userid)
-                                                      FROM {local_iomad_track} lit
-                                                      JOIN {user} u ON (lit.userid = u.id)
-                                                      WHERE lit.courseid = :courseid
-                                                      AND $litcompanysql
-                                                      $userfilter
-                                                      $suspendedsql",
-                                                      ['courseid' => $row->id]);
-            }
-
-            // Deal with any search dates.
-            $datesql = "";
-            $sqlparams = array('companyid' => $company->id, 'courseid' => $row->id);
-            if (!empty($params['from'])) {
-                $datesql = " AND (lit.timeenrolled > :enrolledfrom OR lit.timecompleted > :completedfrom ) ";
-                $sqlparams['enrolledfrom'] = $params['from'];
-                $sqlparams['completedfrom'] = $params['from'];
-            }
-            if (!empty($params['to'])) {
-                $datesql .= " AND (lit.timeenrolled < :enrolledto OR lit.timecompleted < :completedto) ";
-                $sqlparams['enrolledto'] = $params['to'];
-                $sqlparams['completedto'] = $params['to'];
-            }
-
-            // Just valid courses?
-            if ($params['validonly']) {
-                $validcompletedsql = " AND (lit.timeexpires > :runtime or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
-                $sqlparams['runtime'] = time();
-            } else {
-                $validcompletedsql = "";
-            }
-
-            // Count the unused licenses.
-            $licensesunused = $DB->count_records_sql("SELECT COUNT(DISTINCT lit.id)
-                                                      FROM {local_iomad_track} lit
-                                                      JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                                      JOIN {user} u ON (lit.userid = u.id)
-                                                      WHERE lit.courseid = :courseid
-                                                      AND $litcompanysql
-                                                      AND lit.licenseallocated IS NOT NULL
-                                                      AND lit.timeenrolled IS NULL
-                                                      $datesql
-                                                      $suspendedsql",
-                                                      $sqlparams);
-
-            // Count the used licenses.
-            $licensesallocated = $DB->count_records_sql("SELECT count(DISTINCT lit.id) FROM {local_iomad_track} lit
-                                                         JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                                         JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
-                                                         WHERE lit.courseid = :courseid
-                                                         AND $litcompanysql
-                                                         AND lit.licenseallocated IS NOT NULL
-                                                         AND lit.timeenrolled IS NOT NULL
-                                                         $datesql
-                                                         $suspendedsql",
-                                                         $sqlparams);
         }
+
+        // Deal with suspended or not.
+        if (empty($row->showsuspended)) {
+            $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0";
+        } else {
+            $suspendedsql = " AND u.deleted = 0";
+        }
+
+        // Are we showing as a % of all users?
+        if ($params['showpercentage'] == 1) {
+            $totalusers = $DB->count_records_sql("SELECT COUNT(DISTINCT userid)
+                                                  FROM {company_users} cu
+                                                  JOIN {user} u ON (cu.userid = u.id AND cu.userid = u.id)
+                                                  WHERE $cucompanysql
+                                                  $departmentsql
+                                                  $companyuserfilter
+                                                  $suspendedsql",
+                                                  $sqlparams);
+
+        } else if ($params['showpercentage'] == 2) {
+            $totalusers = $DB->count_records_sql("SELECT COUNT(lit.id)
+                                                  FROM {local_iomad_track} lit
+                                                  JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                                                  JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
+                                                  WHERE $litcompanysql
+                                                  AND lit.courseid = :courseid
+                                                  $departmentsql
+                                                  $userfilter
+                                                  $expiredsql
+                                                  $suspendedsql",
+                                                  $sqlparams);
+
+        } else {
+            $totalusers = 1;
+        }
+    
+        // Deal with any search dates.
+        $datesql = "";
+        if (!empty($params['from'])) {
+            $datesql = " AND (lit.licenseallocated > :enrolledfrom) ";
+            $sqlparams['enrolledfrom'] = $params['from'];
+            $sqlparams['completedfrom'] = $params['from'];
+        }
+        if (!empty($params['to'])) {
+            $datesql .= " AND (lit.licenseallocated < :enrolledto) ";
+            $sqlparams['enrolledto'] = $params['to'];
+            $sqlparams['completedto'] = $params['to'];
+        }
+        // Count the unused licenses.
+        $licensesunused = $DB->count_records_sql("SELECT COUNT(lit.id)
+                                                  FROM {local_iomad_track} lit
+                                                  JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                                                  JOIN {user} u ON (lit.userid = u.id)
+                                                  WHERE lit.courseid = :courseid
+                                                  AND $litcompanysql
+                                                  AND lit.licenseallocated IS NOT NULL
+                                                  AND lit.timeenrolled IS NULL
+                                                  $userfilter
+                                                  $datesql
+                                                  $expiredsql
+                                                  $suspendedsql
+                                                  $departmentsql",
+                                                  $sqlparams);
+
+        // Count the used licenses.
+        $licensesallocated = $DB->count_records_sql("SELECT COUNT(lit.id)
+                                                     FROM {local_iomad_track} lit
+                                                     JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                                                     JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
+                                                     WHERE lit.courseid = :courseid
+                                                     AND $litcompanysql
+                                                     AND lit.licenseallocated IS NOT NULL
+                                                     AND lit.timeenrolled IS NOT NULL
+                                                     $userfilter
+                                                     $datesql
+                                                     $expiredsql
+                                                     $suspendedsql
+                                                     $departmentsql",
+                                                     $sqlparams);
+
+        // Keep the remainder in case we need it.
+        $remainder = $totalusers - $licensesallocated - $licensesunused;
 
         if (!$this->is_downloading()) {
             if (!empty($licenseallocated) || $DB->get_record('iomad_courses', array('courseid' => $row->id, 'licensed' => 1))) {
-                $CFG->chart_colorset= ['green', '#d9534f'];
+                $seriesarray = [$licensesallocated, $licensesunused];
+                $labelarray = [get_string('used', 'local_report_completion') . " (" . $licensesallocated . ")",
+                               get_string('unused', 'local_report_completion') . " (" . $licensesunused . ")"];
+                $CFG->chart_colorset= ['green', '#1177d1', 'darkgrey'];
                 $licensechart = new \core\chart_pie();
                 $licensechart->set_doughnut(true); // Calling set_doughnut(true) we display the chart as a doughnut.
-                if ($params['showpercentage']== 0) {
-                    $series = new \core\chart_series('', array($licensesallocated, $licensesunused));
-                    $licensechart->add_series($series);
-                    $licensechart->set_labels(array(get_string('used', 'local_report_completion') . " (" . $licensesallocated . ")",
-                                                    get_string('unused', 'local_report_completion') . " (" . $licensesunused . ")"));
-                } else {
-                    $licensesallocated = number_format($licensesallocated / $totalusers * 100, 2);
-                    $licensesunused = number_format($licensesunused / $totalusers * 100, 2);
-                    $series = new \core\chart_series('', array($licensesallocated, $licensesunused));
-                    $licensechart->add_series($series);
-                    $licensechart->set_labels(array(get_string('used', 'local_report_completion') . " (" . $licensesallocated . "%)",
-                                                    get_string('unused', 'local_report_completion') . " (" . $licensesunused . "%)"));
+                if ($params['showpercentage'] != 0) {
+                    $licensesallocated = !empty($totalusers) ? number_format($licensesallocated / $totalusers * 100, 2): 0;
+                    $licensesunused = !empty($totalusers) ? number_format($licensesunused / $totalusers * 100, 2) : 0;
+                    $remainder = !empty($totalusers) ? number_format($remainder / $totalusers * 100, 2) : 0;
+                    $labelarray = [get_string('used', 'local_report_completion') . " (" . $licensesallocated . "%)",
+                                   get_string('unused', 'local_report_completion') . " (" . $licensesunused . "%)"]; 
+                    if ($params['showpercentage'] == 1) {
+                        $seriesarray = [$licensesallocated, $licensesunused, $remainder];
+                        $labelarray[] = get_string('neverassigned', 'local_report_completion') . " (" . $remainder . "%)";
+                    }
                 }
+                $series = new \core\chart_series('', $seriesarray);
+                $licensechart->add_series($series);
+                $licensechart->set_labels($labelarray);
                 return $output->render($licensechart, false);
             } else {
                 return;
             }
         } else {
             if (!empty($licensesallocated) || $DB->get_record('iomad_courses', array('courseid' => $row->id, 'licensed' => 1))) {
-                return get_string('used', 'local_report_completion') . " = " . ($licensesallocated - $licensesunused) . "\n" .
-                      get_string('unused', 'local_report_completion') . " = $licensesunused\n";
+                $percentchar = "";
+                $remainderstring = "";
+                if ($params['showpercentage'] != 0 ) {
+                    $licensesallocated = !empty($totalusers) ? number_format($licensesallocated / $totalusers * 100, 2) : 0;
+                    $licensesunused = !empty($totalusers) ? number_format($licensesunused / $totalusers * 100, 2) : 0;
+                    $remainder = !empty($totalusers) ? number_format($remainder / $totalusers * 100, 2) : 0;
+                    $percentchar = "%";
+                    if ($params['showpercentage'] == 1) {
+                        $remainderstring = get_string('neverassigned', 'local_report_completion') . " = $licensesunused" ."$percentchar\n";
+                    }
+                }
+                return get_string('used', 'local_report_completion') . " = " . ($licensesallocated - $licensesunused) . "$percentchar\n" .
+                      get_string('unused', 'local_report_completion') . " = $licensesunused" ."$percentchar\n" .
+                      $remainderstring;
             } else {
                 return;
             }
@@ -296,163 +261,249 @@ class course_table extends table_sql {
      * @param object $user the table row being output.
      * @return string HTML content to go inside the td.
      */
-    public function col_licenseuserallocated($row) {
+    public function col_neverassigned($row) {
         global $output, $CFG, $DB, $params, $childcompanies;
 
+        // Set some defaults
+        if (!empty($row->islicensed)) {
+            $userfilter = " AND lit.licenseid NOT IN (SELECT id FROM {companylicense} WHERE type IN (2,3))";
+        } else {
+            $userfilter = " AND cu.educator = 0";
+        }
+        $companyuserfilter ="";
+        $departmentsql ="";
+        $cucompanysql = "cu.companyid = :companyid";
+        $litcompanysql = "lit.companyid = :companyid";
+        $runtime = time();
+
         // Deal with expired results.
-        if (empty($params['showhistoric'])) {
+        if (!empty($params['validonly'])) {
             $expiredsql = " AND (lit.timeexpires > :runtime or (lit.timecompleted IS NULL) or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
         } else {
             $expiredsql = "";
         }
 
-        // Get the company details.
-        $company = new company($row->companyid);
+        $sqlparams = ['companyid' => $row->companyid,
+                      'courseid' => $row->id,
+                      'runtime' => $runtime];
 
         // Is this rolled up or not?
         if (!$params['showsummary'] || empty($childcompanies)) {
+            // Get the company details.
+            $company = new company($row->companyid);
             $parentcompanies = $company->get_parent_companies_recursive();
-    
+
             // Deal with parent company managers
             if (!empty($parentcompanies)) {
-                $userfilter = " AND userid NOT IN (
-                                 SELECT userid FROM {company_users}
-                                 WHERE companyid IN (" . implode(',', array_keys($parentcompanies)) . "))";
-            } else {
-                $userfilter = "";
+                $companyuserfilter = " AND cu.userid NOT IN (
+                                       SELECT userid FROM {company_users}
+                                       WHERE companyid IN (" . implode(',', array_keys($parentcompanies)) . "))";
+                $userfilter .= $companyuserfilter;
             }
-    
+
             // Deal with department tree.
             $alldepartments = company::get_all_subdepartments($row->departmentid);
             $departmentsql = " AND cu.departmentid IN (" . join(",", array_keys($alldepartments)) . ") ";
-    
-            // Deal with suspended or not.
-            if (empty($row->showsuspended)) {
-                $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0 ";
-            } else {
-                $suspendedsql = "AND u.deleted = 0 ";
-            }
-    
-            // Are we showing as a % of all users?
-            if ($params['showpercentage'] == 1) {
-                $totalusers = $DB->count_records_sql("SELECT count(cu.id)
-                                                      FROM {company_users} cu
-                                                      JOIN {user} u ON (cu.userid = u.id)
-                                                      WHERE cu.companyid = :companyid
-                                                      $departmentsql
-                                                      $userfilter
-                                                      $suspendedsql",
-                                                      array('companyid' => $company->id));
-            } else if ($params['showpercentage'] == 2) {
-                $totalusers = $DB->count_records_sql("SELECT count(DISTINCT lit.userid)
-                                                      FROM {local_iomad_track} lit
-                                                      JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                                      JOIN {department} d ON (cu.departmentid = d.id)
-                                                      JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
-                                                      WHERE lit.courseid = :courseid
-                                                      $expiredsql
-                                                      $userfilter
-                                                      $suspendedsql
-                                                      $departmentsql",
-                                                      ['courseid' => $row->id,
-                                                      'runtime' => time()]);
-            }
-    
-            // Deal with any search dates.
-            $datesql = "";
-            $sqlparams = array('companyid' => $company->id, 'courseid' => $row->id);
-            if (!empty($params['from'])) {
-                $datesql = " AND (lit.licenseallocated > :enrolledfrom) ";
-                $sqlparams['enrolledfrom'] = $params['from'];
-                $sqlparams['completedfrom'] = $params['from'];
-            }
-            if (!empty($params['to'])) {
-                $datesql .= " AND (lit.licenseallocated < :enrolledto) ";
-                $sqlparams['enrolledto'] = $params['to'];
-                $sqlparams['completedto'] = $params['to'];
-            }
-
-            // Count the used licenses.
-            $licensesallocated = $DB->count_records_sql("SELECT count(DISTINCT lit.id) FROM {local_iomad_track} lit
-                                                         JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                                         JOIN {user} u ON (lit.userid = u.id)
-                                                         WHERE lit.courseid = :courseid
-                                                         AND lit.companyid = :companyid
-                                                         AND lit.licenseallocated IS NOT NULL
-                                                         $datesql
-                                                         $suspendedsql
-                                                         $departmentsql",
-                                                         $sqlparams);
         } else {
-            // Deal with suspended or not.
-            if (empty($row->showsuspended)) {
-                $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0";
-            } else {
-                $suspendedsql = " AND u.deleted = 0";
-            }
-
             $cucompanysql = " cu.companyid IN (" . implode(',', array_keys($childcompanies)) .")";
             $litcompanysql = " lit.companyid IN (" . implode(',', array_keys($childcompanies)) .")";
-
-            // Are we showing as a % of all users?
-            if ($params['showpercentage'] == 1) {
-                $totalusers = $DB->count_records_sql("SELECT count(cu.id)
-                                                      FROM {company_users} cu
-                                                      JOIN {user} u ON (cu.userid = u.id)
-                                                      WHERE $cucompanysql
-                                                      $userfilter
-                                                      $suspendedsql");
-            } else if ($params['showpercentage'] == 2) {
-                $totalusers = $DB->count_records_sql("SELECT count(DISTINCT lit.userid)
-                                                      FROM {local_iomad_track} lit
-                                                      JOIN {user} u ON (lit.userid = u.id)
-                                                      WHERE lit.courseid = :courseid
-                                                      AND $litcompanysql
-                                                      $userfilter
-                                                      $suspendedsql",
-                                                      ['courseid' => $row->id]);
-            }
-
-            // Deal with any search dates.
-            $datesql = "";
-            $sqlparams = array('companyid' => $company->id, 'courseid' => $row->id);
-            if (!empty($params['from'])) {
-                $datesql = " AND (lit.timeenrolled > :enrolledfrom OR lit.timecompleted > :completedfrom ) ";
-                $sqlparams['enrolledfrom'] = $params['from'];
-                $sqlparams['completedfrom'] = $params['from'];
-            }
-            if (!empty($params['to'])) {
-                $datesql .= " AND (lit.timeenrolled < :enrolledto OR lit.timecompleted < :completedto) ";
-                $sqlparams['enrolledto'] = $params['to'];
-                $sqlparams['completedto'] = $params['to'];
-            }
-
-            // Just valid courses?
-            if ($params['validonly']) {
-                $validcompletedsql = " AND (lit.timeexpires > :runtime or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
-                $sqlparams['runtime'] = time();
-            } else {
-                $validcompletedsql = "";
-            }
-
-            // Count the used licenses.
-            $licensesallocated = $DB->count_records_sql("SELECT count(DISTINCT lit.id) FROM {local_iomad_track} lit
-                                                         JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                                         JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
-                                                         WHERE lit.courseid = :courseid
-                                                         AND $litcompanysql
-                                                         AND lit.licenseallocated IS NOT NULL
-                                                         $datesql
-                                                         $suspendedsql",
-                                                         $sqlparams);
         }
 
-        if (!empty($licensesallocated) || $DB->get_record('iomad_courses', array('courseid' => $row->id, 'licensed' => 1))) {
+        // Deal with suspended or not.
+        if (empty($row->showsuspended)) {
+            $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0";
+        } else {
+            $suspendedsql = " AND u.deleted = 0";
+        }
+
+        // Get count of all of the users.
+        $totalusers = $DB->count_records_sql("SELECT COUNT(DISTINCT userid)
+                                              FROM {company_users} cu
+                                              JOIN {user} u ON (cu.userid = u.id AND cu.userid = u.id)
+                                              WHERE $cucompanysql
+                                              $departmentsql
+                                              $companyuserfilter
+                                              $suspendedsql",
+                                              $sqlparams);
+
+    
+        // Deal with any search dates.
+        $datesql = "";
+        if (!empty($params['from'])) {
+            $datesql = " AND (lit.licenseallocated > :enrolledfrom) ";
+            $sqlparams['enrolledfrom'] = $params['from'];
+            $sqlparams['completedfrom'] = $params['from'];
+        }
+        if (!empty($params['to'])) {
+            $datesql .= " AND (lit.licenseallocated < :enrolledto) ";
+            $sqlparams['enrolledto'] = $params['to'];
+            $sqlparams['completedto'] = $params['to'];
+        }
+        // Count the unused licenses.
+        $licensesunused = $DB->count_records_sql("SELECT COUNT(lit.id)
+                                                  FROM {local_iomad_track} lit
+                                                  JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                                                  JOIN {user} u ON (lit.userid = u.id)
+                                                  WHERE lit.courseid = :courseid
+                                                  AND $litcompanysql
+                                                  AND lit.licenseallocated IS NOT NULL
+                                                  AND lit.timeenrolled IS NULL
+                                                  $userfilter
+                                                  $datesql
+                                                  $expiredsql
+                                                  $suspendedsql
+                                                  $departmentsql",
+                                                  $sqlparams);
+
+        // Count the used licenses.
+        $licensesallocated = $DB->count_records_sql("SELECT COUNT(lit.id)
+                                                     FROM {local_iomad_track} lit
+                                                     JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                                                     JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
+                                                     WHERE lit.courseid = :courseid
+                                                     AND $litcompanysql
+                                                     AND lit.licenseallocated IS NOT NULL
+                                                     AND lit.timeenrolled IS NOT NULL
+                                                     $userfilter
+                                                     $datesql
+                                                     $expiredsql
+                                                     $suspendedsql
+                                                     $departmentsql",
+                                                     $sqlparams);
+
+        // Keep the remainder in case we need it.
+        $remainder = $totalusers - $licensesallocated - $licensesunused;
+
+        if (!empty($remainder) || $DB->get_record('iomad_courses', array('courseid' => $row->id, 'licensed' => 1))) {
+            if (!empty($totalusers)) {
+                return get_string('percents', 'moodle', number_format($remainder / $totalusers * 100, 2));
+            } else {
+                return get_string('percents', 'moodle', 0);
+            }
+        }
+    }
+
+    /**
+     * Generate the display of the user's lastname
+     * @param object $user the table row being output.
+     * @return string HTML content to go inside the td.
+     */
+    public function col_licenseunused($row) {
+        global $output, $CFG, $DB, $params, $childcompanies;
+
+        // Set some defaults
+        if (!empty($row->islicensed)) {
+            $userfilter = " AND lit.licenseid NOT IN (SELECT id FROM {companylicense} WHERE type IN (2,3))";
+        } else {
+            $userfilter = " AND cu.educator = 0";
+        }
+        $companyuserfilter = "";
+        $departmentsql ="";
+        $cucompanysql = "cu.companyid = :companyid";
+        $litcompanysql = "lit.companyid = :companyid";
+        $runtime = time();
+
+        // Deal with expired results.
+        if (!empty($params['validonly'])) {
+            $expiredsql = " AND (lit.timeexpires > :runtime or (lit.timecompleted IS NULL) or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
+        } else {
+            $expiredsql = "";
+        }
+
+        $sqlparams = ['companyid' => $row->companyid,
+                      'courseid' => $row->id,
+                      'runtime' => $runtime];
+
+        // Is this rolled up or not?
+        if (!$params['showsummary'] || empty($childcompanies)) {
+            // Get the company details.
+            $company = new company($row->companyid);
+            $parentcompanies = $company->get_parent_companies_recursive();
+
+            // Deal with parent company managers
+            if (!empty($parentcompanies)) {
+                $companyuserfilter = " AND cu.userid NOT IN (
+                                       SELECT userid FROM {company_users}
+                                       WHERE companyid IN (" . implode(',', array_keys($parentcompanies)) . "))";
+                $userfilter .= $companyuserfilter;
+            }
+
+            // Deal with department tree.
+            $alldepartments = company::get_all_subdepartments($row->departmentid);
+            $departmentsql = " AND cu.departmentid IN (" . join(",", array_keys($alldepartments)) . ") ";
+        } else {
+            $cucompanysql = " cu.companyid IN (" . implode(',', array_keys($childcompanies)) .")";
+            $litcompanysql = " lit.companyid IN (" . implode(',', array_keys($childcompanies)) .")";
+        }
+
+        // Deal with suspended or not.
+        if (empty($row->showsuspended)) {
+            $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0";
+        } else {
+            $suspendedsql = " AND u.deleted = 0";
+        }
+
+        // Are we showing as a % of all users?
+        if ($params['showpercentage'] == 1) {
+            $totalusers = $DB->count_records_sql("SELECT COUNT(DISTINCT userid)
+                                                  FROM {company_users} cu
+                                                  JOIN {user} u ON (cu.userid = u.id AND cu.userid = u.id)
+                                                  WHERE $cucompanysql
+                                                  $departmentsql
+                                                  $companyuserfilter
+                                                  $suspendedsql",
+                                                  $sqlparams);
+
+        } else if ($params['showpercentage'] == 2) {
+            $totalusers = $DB->count_records_sql("SELECT COUNT(lit.id)
+                                                  FROM {local_iomad_track} lit
+                                                  JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                                                  JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
+                                                  WHERE $litcompanysql
+                                                  AND lit.courseid = :courseid
+                                                  $departmentsql
+                                                  $userfilter
+                                                  $expiredsql
+                                                  $suspendedsql",
+                                                  $sqlparams);
+
+        }
+    
+        // Deal with any search dates.
+        $datesql = "";
+        if (!empty($params['from'])) {
+            $datesql = " AND (lit.licenseallocated > :enrolledfrom) ";
+            $sqlparams['enrolledfrom'] = $params['from'];
+            $sqlparams['completedfrom'] = $params['from'];
+        }
+        if (!empty($params['to'])) {
+            $datesql .= " AND (lit.licenseallocated < :enrolledto) ";
+            $sqlparams['enrolledto'] = $params['to'];
+            $sqlparams['completedto'] = $params['to'];
+        }
+
+        // Count the unused licenses.
+        $licensesunused = $DB->count_records_sql("SELECT COUNT(lit.id)
+                                                  FROM {local_iomad_track} lit
+                                                  JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                                                  JOIN {user} u ON (lit.userid = u.id)
+                                                  WHERE lit.courseid = :courseid
+                                                  AND $litcompanysql
+                                                  AND lit.licenseallocated IS NOT NULL
+                                                  AND lit.timeenrolled IS NULL
+                                                  $userfilter
+                                                  $datesql
+                                                  $expiredsql
+                                                  $suspendedsql
+                                                  $departmentsql",
+                                                  $sqlparams);
+     
+        if (!empty($licensesunused) || $DB->get_record('iomad_courses', array('courseid' => $row->id, 'licensed' => 1))) {
             if ($params['showpercentage']== 0) {
-                return $licensesallocated;
+                return $licensesunused;
             } else {
                 if (!empty($totalusers)) {
-                    return get_string('percents', 'moodle', number_format($licensesallocated / $totalusers * 100, 2));
+                    return get_string('percents', 'moodle', number_format($licensesunused / $totalusers * 100, 2));
                 } else {
                     return get_string('percents', 'moodle', 0);
                 }
@@ -470,155 +521,112 @@ class course_table extends table_sql {
     public function col_licenseuserused($row) {
         global $output, $CFG, $DB, $params, $childcompanies;
 
+        // Set some defaults
+        if (!empty($row->islicensed)) {
+            $userfilter = " AND lit.licenseid NOT IN (SELECT id FROM {companylicense} WHERE type IN (2,3))";
+        } else {
+            $userfilter = " AND cu.educator = 0";
+        }
+        $companyuserfilter = "";
+        $departmentsql ="";
+        $cucompanysql = "cu.companyid = :companyid";
+        $litcompanysql = "lit.companyid = :companyid";
+        $runtime = time();
+
         // Deal with expired results.
-        if (empty($params['showhistoric'])) {
+        if (!empty($params['validonly'])) {
             $expiredsql = " AND (lit.timeexpires > :runtime or (lit.timecompleted IS NULL) or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
         } else {
             $expiredsql = "";
         }
 
-        // Get the company details.
-        $company = new company($row->companyid);
+        $sqlparams = ['companyid' => $row->companyid,
+                      'courseid' => $row->id,
+                      'runtime' => $runtime];
 
         // Is this rolled up or not?
         if (!$params['showsummary'] || empty($childcompanies)) {
+            // Get the company details.
+            $company = new company($row->companyid);
             $parentcompanies = $company->get_parent_companies_recursive();
-    
+
             // Deal with parent company managers
             if (!empty($parentcompanies)) {
-                $userfilter = " AND userid NOT IN (
-                                 SELECT userid FROM {company_users}
-                                 WHERE companyid IN (" . implode(',', array_keys($parentcompanies)) . "))";
-            } else {
-                $userfilter = "";
+                $companyuserfilter = " AND cu.userid NOT IN (
+                                       SELECT userid FROM {company_users}
+                                       WHERE companyid IN (" . implode(',', array_keys($parentcompanies)) . "))";
+                $userfilter .= $companyuserfilter;
             }
-    
+
             // Deal with department tree.
             $alldepartments = company::get_all_subdepartments($row->departmentid);
             $departmentsql = " AND cu.departmentid IN (" . join(",", array_keys($alldepartments)) . ") ";
-    
-            // Deal with suspended or not.
-            if (empty($row->showsuspended)) {
-                $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0 ";
-            } else {
-                $suspendedsql = "AND u.deleted = 0 ";
-            }
-    
-            // Are we showing as a % of all users?
-            if ($params['showpercentage'] == 1) {
-                $totalusers = $DB->count_records_sql("SELECT count(cu.id)
-                                                      FROM {company_users} cu
-                                                      JOIN {user} u ON (cu.userid = u.id)
-                                                      WHERE cu.companyid = :companyid
-                                                      $departmentsql
-                                                      $userfilter
-                                                      $suspendedsql",
-                                                      array('companyid' => $company->id));
-            } else if ($params['showpercentage'] == 2) {
-                $totalusers = $DB->count_records_sql("SELECT count(DISTINCT lit.userid)
-                                                      FROM {local_iomad_track} lit
-                                                      JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                                      JOIN {department} d ON (cu.departmentid = d.id)
-                                                      JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
-                                                      WHERE lit.courseid = :courseid
-                                                      $expiredsql
-                                                      $userfilter
-                                                      $suspendedsql
-                                                      $departmentsql",
-                                                      ['courseid' => $row->id,
-                                                      'runtime' => time()]);
-            }
-    
-            // Deal with any search dates.
-            $datesql = "";
-            $sqlparams = array('companyid' => $company->id, 'courseid' => $row->id);
-            if (!empty($params['from'])) {
-                $datesql = " AND (lit.licenseallocated > :enrolledfrom) ";
-                $sqlparams['enrolledfrom'] = $params['from'];
-                $sqlparams['completedfrom'] = $params['from'];
-            }
-            if (!empty($params['to'])) {
-                $datesql .= " AND (lit.licenseallocated < :enrolledto) ";
-                $sqlparams['enrolledto'] = $params['to'];
-                $sqlparams['completedto'] = $params['to'];
-            }
-
-            // Count the used licenses.
-            $licensesused = $DB->count_records_sql("SELECT count(DISTINCT lit.id) FROM {local_iomad_track} lit
-                                                    JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                                    JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
-                                                    WHERE lit.courseid = :courseid
-                                                    AND lit.companyid = :companyid
-                                                    AND lit.licenseallocated IS NOT NULL
-                                                    AND lit.timeenrolled IS NOT NULL
-                                                    $datesql
-                                                    $suspendedsql
-                                                    $departmentsql",
-                                                    $sqlparams);
         } else {
-            // Deal with suspended or not.
-            if (empty($row->showsuspended)) {
-                $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0";
-            } else {
-                $suspendedsql = " AND u.deleted = 0";
-            }
-
             $cucompanysql = " cu.companyid IN (" . implode(',', array_keys($childcompanies)) .")";
             $litcompanysql = " lit.companyid IN (" . implode(',', array_keys($childcompanies)) .")";
-
-            // Are we showing as a % of all users?
-            if ($params['showpercentage'] == 1) {
-                $totalusers = $DB->count_records_sql("SELECT count(cu.id)
-                                                      FROM {company_users} cu
-                                                      JOIN {user} u ON (cu.userid = u.id)
-                                                      WHERE $cucompanysql
-                                                      $userfilter
-                                                      $suspendedsql");
-            } else if ($params['showpercentage'] == 2) {
-                $totalusers = $DB->count_records_sql("SELECT count(DISTINCT lit.userid)
-                                                      FROM {local_iomad_track} lit
-                                                      JOIN {user} u ON (lit.userid = u.id)
-                                                      WHERE lit.courseid = :courseid
-                                                      AND $litcompanysql
-                                                      $userfilter
-                                                      $suspendedsql",
-                                                      ['courseid' => $row->id]);
-            }
-
-            // Deal with any search dates.
-            $datesql = "";
-            $sqlparams = array('companyid' => $company->id, 'courseid' => $row->id);
-            if (!empty($params['from'])) {
-                $datesql = " AND (lit.timeenrolled > :enrolledfrom OR lit.timecompleted > :completedfrom ) ";
-                $sqlparams['enrolledfrom'] = $params['from'];
-                $sqlparams['completedfrom'] = $params['from'];
-            }
-            if (!empty($params['to'])) {
-                $datesql .= " AND (lit.timeenrolled < :enrolledto OR lit.timecompleted < :completedto) ";
-                $sqlparams['enrolledto'] = $params['to'];
-                $sqlparams['completedto'] = $params['to'];
-            }
-
-            // Just valid courses?
-            if ($params['validonly']) {
-                $validcompletedsql = " AND (lit.timeexpires > :runtime or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
-                $sqlparams['runtime'] = time();
-            } else {
-                $validcompletedsql = "";
-            }
-
-            // Count the used licenses.
-            $licensesused = $DB->count_records_sql("SELECT count(DISTINCT lit.id) FROM {local_iomad_track} lit
-                                                    JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                                    JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
-                                                    WHERE lit.courseid = :courseid
-                                                    AND $litcompanysql
-                                                    AND lit.licenseallocated IS NOT NULL
-                                                    AND lit.timeenrolled IS NOT NULL
-                                                    $datesql
-                                                    $suspendedsql",
-                                                    $sqlparams);
         }
+
+        // Deal with suspended or not.
+        if (empty($row->showsuspended)) {
+            $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0";
+        } else {
+            $suspendedsql = " AND u.deleted = 0";
+        }
+
+        // Are we showing as a % of all users?
+        if ($params['showpercentage'] == 1) {
+            $totalusers = $DB->count_records_sql("SELECT COUNT(DISTINCT userid)
+                                                  FROM {company_users} cu
+                                                  JOIN {user} u ON (cu.userid = u.id AND cu.userid = u.id)
+                                                  WHERE $cucompanysql
+                                                  $departmentsql
+                                                  $companyuserfilter
+                                                  $suspendedsql",
+                                                  $sqlparams);
+
+        } else if ($params['showpercentage'] == 2) {
+            $totalusers = $DB->count_records_sql("SELECT COUNT(lit.id)
+                                                  FROM {local_iomad_track} lit
+                                                  JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                                                  JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
+                                                  WHERE $litcompanysql
+                                                  AND lit.courseid = :courseid
+                                                  $departmentsql
+                                                  $userfilter
+                                                  $expiredsql
+                                                  $suspendedsql",
+                                                  $sqlparams);
+
+        }
+    
+        // Deal with any search dates.
+        $datesql = "";
+        if (!empty($params['from'])) {
+            $datesql = " AND (lit.licenseallocated > :enrolledfrom) ";
+            $sqlparams['enrolledfrom'] = $params['from'];
+            $sqlparams['completedfrom'] = $params['from'];
+        }
+        if (!empty($params['to'])) {
+            $datesql .= " AND (lit.licenseallocated < :enrolledto) ";
+            $sqlparams['enrolledto'] = $params['to'];
+            $sqlparams['completedto'] = $params['to'];
+        }
+
+        // Count the used licenses.
+        $licensesused = $DB->count_records_sql("SELECT COUNT(lit.id)
+                                                FROM {local_iomad_track} lit
+                                                JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                                                JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
+                                                WHERE lit.courseid = :courseid
+                                                AND $litcompanysql
+                                                AND lit.licenseallocated IS NOT NULL
+                                                AND lit.timeenrolled IS NOT NULL
+                                                $userfilter
+                                                $datesql
+                                                $expiredsql
+                                                $suspendedsql
+                                                $departmentsql",
+                                                $sqlparams);
 
         if (!empty($licensesused) || $DB->get_record('iomad_courses', array('courseid' => $row->id, 'licensed' => 1))) {
             if ($params['showpercentage']== 0) {
@@ -643,6 +651,18 @@ class course_table extends table_sql {
     public function col_userstarted($row) {
         global $output, $CFG, $USER, $DB, $params, $childcompanies;
 
+        // Set some defaults
+        if (!empty($row->islicensed)) {
+            $userfilter = " AND lit.licenseid NOT IN (SELECT id FROM {companylicense} WHERE type IN (2,3))";
+        } else {
+            $userfilter = " AND cu.educator = 0";
+        }
+        $companyuserfilter ="";
+        $departmentsql ="";
+        $cucompanysql = "cu.companyid = :companyid";
+        $litcompanysql = "lit.companyid = :companyid";
+        $runtime = time();
+
         // Deal with expired results.
         if (!empty($params['validonly'])) {
             $expiredsql = " AND (lit.timeexpires > :runtime or (lit.timecompleted IS NULL) or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
@@ -650,155 +670,101 @@ class course_table extends table_sql {
             $expiredsql = "";
         }
 
-        // Get the company details.
-        $company = new company($row->companyid);
+        $sqlparams = ['companyid' => $row->companyid,
+                      'courseid' => $row->id,
+                      'runtime' => $runtime];
 
         // Is this rolled up or not?
         if (!$params['showsummary'] || empty($childcompanies)) {
+            // Get the company details.
+            $company = new company($row->companyid);
             $parentcompanies = $company->get_parent_companies_recursive();
 
             // Deal with parent company managers
             if (!empty($parentcompanies)) {
-                $userfilter = " AND userid NOT IN (
-                                 SELECT userid FROM {company_users}
-                                 WHERE companyid IN (" . implode(',', array_keys($parentcompanies)) . "))";
-            } else {
-                $userfilter = "";
+                $companyuserfilter = " AND cu.userid NOT IN (
+                                       SELECT userid FROM {company_users}
+                                       WHERE companyid IN (" . implode(',', array_keys($parentcompanies)) . "))";
+                $userfilter .= $companyuserfilter;
             }
 
             // Deal with department tree.
             $alldepartments = company::get_all_subdepartments($row->departmentid);
             $departmentsql = " AND cu.departmentid IN (" . join(",", array_keys($alldepartments)) . ") ";
-    
-            // Deal with suspended or not.
-            if (empty($row->showsuspended)) {
-                $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0";
-            } else {
-                $suspendedsql = " AND u.deleted = 0";
-            }
-
-            // Are we showing as a % of all users?
-            if ($params['showpercentage'] == 1) {
-                $totalusers = $DB->count_records_sql("SELECT count(cu.id)
-                                                      FROM {company_users} cu
-                                                      JOIN {user} u ON (cu.userid = u.id)
-                                                      WHERE cu.companyid = :companyid
-                                                      $departmentsql
-                                                      $userfilter
-                                                      $suspendedsql",
-                                                      array('companyid' => $company->id));
-            } else if ($params['showpercentage'] == 2) {
-                $totalusers = $DB->count_records_sql("SELECT count(DISTINCT lit.userid)
-                                                      FROM {local_iomad_track} lit
-                                                      JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                                      JOIN {department} d ON (cu.departmentid = d.id)
-                                                      JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
-                                                      WHERE lit.courseid = :courseid
-                                                      $expiredsql
-                                                      $userfilter
-                                                      $suspendedsql
-                                                      $departmentsql",
-                                                      ['courseid' => $row->id,
-                                                      'runtime' => time()]);
-            }
-            // Deal with any search dates.
-            $datesql = "";
-            $sqlparams = ['companyid' => $company->id,
-                          'courseid' => $row->id,
-                          'runtime' => time()];
-            if (!empty($params['from'])) {
-                $datesql = " AND (lit.timeenrolled > :enrolledfrom OR lit.timecompleted > :completedfrom ) ";
-                $sqlparams['enrolledfrom'] = $params['from'];
-                $sqlparams['completedfrom'] = $params['from'];
-            }
-            if (!empty($params['to'])) {
-                $datesql .= " AND (lit.timeenrolled < :enrolledto OR lit.timecompleted < :completedto) ";
-                $sqlparams['enrolledto'] = $params['to'];
-                $sqlparams['completedto'] = $params['to'];
-            }
-
-            // Just valid courses?
-            if ($params['validonly']) {
-                $validcompletedsql = " AND (lit.timeexpires > :runtime or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
-                $sqlparams['runtime'] = time();
-            } else {
-                $validcompletedsql = "";
-            }
-
-            // Count the enrolled users
-            $started = $DB->count_records_sql("SELECT COUNT(DISTINCT lit.id)
-                                               FROM {local_iomad_track} lit
-                                               JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                               JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
-                                               WHERE lit.companyid = :companyid
-                                               AND lit.courseid = :courseid
-                                               AND lit.timeenrolled IS NOT NULL
-                                               $expiredsql
-                                               $datesql
-                                               $suspendedsql
-                                               $departmentsql",
-                                               $sqlparams);
         } else {
-            // Deal with suspended or not.
-            if (empty($row->showsuspended)) {
-                $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0";
-            } else {
-                $suspendedsql = " AND u.deleted = 0";
-            }
-
             $cucompanysql = " cu.companyid IN (" . implode(',', array_keys($childcompanies)) .")";
             $litcompanysql = " lit.companyid IN (" . implode(',', array_keys($childcompanies)) .")";
-
-            // Are we showing as a % of all users?
-            if ($params['showpercentage'] == 1) {
-                $totalusers = $DB->count_records_sql("SELECT count(cu.id)
-                                                      FROM {company_users} cu
-                                                      JOIN {user} u ON (cu.userid = u.id)
-                                                      WHERE $cucompanysql
-                                                      $userfilter
-                                                      $suspendedsql");
-            } else if ($params['showpercentage'] == 2) {
-                $totalusers = $DB->count_records_sql("SELECT count(DISTINCT lit.userid)
-                                                      FROM {local_iomad_track} lit
-                                                      JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                                      JOIN {department} d ON (cu.departmentid = d.id)
-                                                      JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
-                                                      WHERE lit.courseid = :courseid
-                                                      AND $cucompanysql
-                                                      $expiredsql
-                                                      $userfilter
-                                                      $suspendedsql
-                                                      $departmentsql",
-                                                      ['courseid' => $row->id,
-                                                      'runtime' => time()]);
-            }
-
-            // Deal with any search dates.
-            $datesql = "";
-            $sqlparams = array('companyid' => $company->id, 'courseid' => $row->id, 'runtime' => time());
-            if (!empty($params['from'])) {
-                $datesql = " AND (lit.timeenrolled > :enrolledfrom OR lit.timecompleted > :completedfrom ) ";
-                $sqlparams['enrolledfrom'] = $params['from'];
-                $sqlparams['completedfrom'] = $params['from'];
-            }
-            if (!empty($params['to'])) {
-                $datesql .= " AND (lit.timeenrolled < :enrolledto OR lit.timecompleted < :completedto) ";
-                $sqlparams['enrolledto'] = $params['to'];
-                $sqlparams['completedto'] = $params['to'];
-            }
-
-            // Count the enrolled users
-            $started = $DB->count_records_sql("SELECT COUNT(DISTINCT lit.id)
-                                               FROM {local_iomad_track} lit
-                                               JOIN {user} u ON (lit.userid = u.id)
-                                               WHERE lit.courseid = :courseid
-                                               AND $litcompanysql
-                                               AND lit.timeenrolled > 0
-                                               $expiredsql
-                                               $datesql
-                                               $suspendedsql",
-                                               $sqlparams);
         }
+
+        // Deal with suspended or not.
+        if (empty($row->showsuspended)) {
+            $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0";
+        } else {
+            $suspendedsql = " AND u.deleted = 0";
+        }
+
+        // Are we showing as a % of all users?
+        if ($params['showpercentage'] == 1) {
+            $totalusers = $DB->count_records_sql("SELECT COUNT(DISTINCT userid)
+                                                  FROM {company_users} cu
+                                                  JOIN {user} u ON (cu.userid = u.id AND cu.userid = u.id)
+                                                  WHERE $cucompanysql
+                                                  $departmentsql
+                                                  $companyuserfilter
+                                                  $suspendedsql",
+                                                  $sqlparams);
+
+        } else if ($params['showpercentage'] == 2) {
+            $totalusers = $DB->count_records_sql("SELECT COUNT(lit.id)
+                                                  FROM {local_iomad_track} lit
+                                                  JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                                                  JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
+                                                  WHERE $litcompanysql
+                                                  AND lit.courseid = :courseid
+                                                  $departmentsql
+                                                  $userfilter
+                                                  $expiredsql
+                                                  $suspendedsql",
+                                                  $sqlparams);
+
+        }
+
+        // Deal with any search dates.
+        $datesql = "";
+        if (!empty($params['from'])) {
+            $datesql = " AND (lit.timeenrolled > :enrolledfrom OR lit.timecompleted > :completedfrom ) ";
+            $sqlparams['enrolledfrom'] = $params['from'];
+            $sqlparams['completedfrom'] = $params['from'];
+        }
+        if (!empty($params['to'])) {
+            $datesql .= " AND (lit.timeenrolled < :enrolledto OR lit.timecompleted < :completedto) ";
+            $sqlparams['enrolledto'] = $params['to'];
+            $sqlparams['completedto'] = $params['to'];
+        }
+
+        // Just valid courses?
+        if ($params['validonly']) {
+            $validcompletedsql = " AND (lit.timeexpires > :validtime or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
+            $sqlparams['validtime'] = $runtime;
+        } else {
+            $validcompletedsql = "";
+        }
+
+        // Count the enrolled users
+        $started = $DB->count_records_sql("SELECT COUNT(lit.id)
+                                           FROM {local_iomad_track} lit
+                                           JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                                           JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
+                                           WHERE $litcompanysql
+                                           AND lit.courseid = :courseid
+                                           AND lit.timeenrolled IS NOT NULL
+                                           AND lit.timecompleted IS NULL
+                                           $userfilter
+                                           $datesql
+                                           $expiredsql
+                                           $suspendedsql
+                                           $departmentsql",
+                                           $sqlparams);
 
         if ($params['showpercentage'] == 0) {
             return $started;
@@ -819,156 +785,126 @@ class course_table extends table_sql {
     public function col_userinprogress($row) {
         global $output, $CFG, $USER, $DB, $params, $childcompanies;
 
+        // Set some defaults
+        if (!empty($row->islicensed)) {
+            $userfilter = " AND lit.licenseid NOT IN (SELECT id FROM {companylicense} WHERE type IN (2,3))";
+        } else {
+            $userfilter = " AND cu.educator = 0";
+        }
+        $companyuserfilter ="";
+        $departmentsql ="";
+        $cucompanysql = "cu.companyid = :companyid";
+        $litcompanysql = "lit.companyid = :companyid";
+        $runtime = time();
+
         // Deal with expired results.
-        if (empty($params['showhistoric'])) {
+        if (!empty($params['validonly'])) {
             $expiredsql = " AND (lit.timeexpires > :runtime or (lit.timecompleted IS NULL) or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
         } else {
             $expiredsql = "";
         }
 
-        // Get the company details.
-        $company = new company($row->companyid);
+        $sqlparams = ['companyid' => $row->companyid,
+                      'courseid' => $row->id,
+                      'runtime' => $runtime];
 
         // Is this rolled up or not?
         if (!$params['showsummary'] || empty($childcompanies)) {
+            // Get the company details.
+            $company = new company($row->companyid);
             $parentcompanies = $company->get_parent_companies_recursive();
 
             // Deal with parent company managers
             if (!empty($parentcompanies)) {
-                $userfilter = " AND userid NOT IN (
-                                 SELECT userid FROM {company_users}
-                                 WHERE companyid IN (" . implode(',', array_keys($parentcompanies)) . "))";
-            } else {
-                $userfilter = "";
+                $companyuserfilter = " AND cu.userid NOT IN (
+                                       SELECT userid FROM {company_users}
+                                       WHERE companyid IN (" . implode(',', array_keys($parentcompanies)) . "))";
+                $userfilter .= $companyuserfilter;
             }
 
             // Deal with department tree.
             $alldepartments = company::get_all_subdepartments($row->departmentid);
             $departmentsql = " AND cu.departmentid IN (" . join(",", array_keys($alldepartments)) . ") ";
-    
-            // Deal with suspended or not.
-            if (empty($row->showsuspended)) {
-                $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0";
-            } else {
-                $suspendedsql = " AND u.deleted = 0";
-            }
+        } else {
+            $cucompanysql = " cu.companyid IN (" . implode(',', array_keys($childcompanies)) .")";
+            $litcompanysql = " lit.companyid IN (" . implode(',', array_keys($childcompanies)) .")";
+        }
 
-            // Are we showing as a % of all users?
-            if ($params['showpercentage'] == 1) {
-                $totalusers = $DB->count_records_sql("SELECT count(cu.id)
-                                                      FROM {company_users} cu
-                                                      JOIN {user} u ON (cu.userid = u.id)
-                                                      WHERE cu.companyid = :companyid
-                                                      $departmentsql
-                                                      $userfilter
-                                                      $suspendedsql",
-                                                      array('companyid' => $company->id));
-            } else if ($params['showpercentage'] == 2) {
-                $totalusers = $DB->count_records_sql("SELECT count(DISTINCT lit.userid)
-                                                      FROM {local_iomad_track} lit
-                                                      JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                                      JOIN {department} d ON (cu.departmentid = d.id)
-                                                      JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
-                                                      WHERE lit.courseid = :courseid
-                                                      $expiredsql
-                                                      $userfilter
-                                                      $suspendedsql
-                                                      $departmentsql",
-                                                      ['courseid' => $row->id,
-                                                      'runtime' => time()]);
-            }
+        // Deal with suspended or not.
+        if (empty($row->showsuspended)) {
+            $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0";
+        } else {
+            $suspendedsql = " AND u.deleted = 0";
+        }
 
-            // Deal with any search dates.
-            $datesql = "";
-            $sqlparams = array('companyid' => $company->id, 'courseid' => $row->id, 'runtime' => time());
-            if (!empty($params['from'])) {
-                $datesql = " AND (lit.timeenrolled > :enrolledfrom OR lit.timecompleted > :completedfrom ) ";
-                $sqlparams['enrolledfrom'] = $params['from'];
-                $sqlparams['completedfrom'] = $params['from'];
-            }
-            if (!empty($params['to'])) {
-                $datesql .= " AND (lit.timeenrolled < :enrolledto OR lit.timecompleted < :completedto) ";
-                $sqlparams['enrolledto'] = $params['to'];
-                $sqlparams['completedto'] = $params['to'];
-            }
+        // Are we showing as a % of all users?
+        if ($params['showpercentage'] == 1) {
+            $totalusers = $DB->count_records_sql("SELECT COUNT(DISTINCT userid)
+                                                  FROM {company_users} cu
+                                                  JOIN {user} u ON (cu.userid = u.id AND cu.userid = u.id)
+                                                  WHERE $cucompanysql
+                                                  $departmentsql
+                                                  $companyuserfilter
+                                                  $suspendedsql",
+                                                  $sqlparams);
 
-            // Count the enrolled users
-            $inprogress = $DB->count_records_sql("SELECT COUNT(DISTINCT lit.id)
+        } else if ($params['showpercentage'] == 2) {
+            $totalusers = $DB->count_records_sql("SELECT COUNT(lit.id)
                                                   FROM {local_iomad_track} lit
                                                   JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
                                                   JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
-                                                  WHERE lit.courseid = :courseid
-                                                  AND lit.timeenrolled IS NOT NULL
-                                                  AND lit.timecompleted IS NULL
+                                                  WHERE $litcompanysql
+                                                  AND lit.courseid = :courseid
+                                                  $departmentsql
+                                                  $userfilter
                                                   $expiredsql
-                                                  $datesql
-                                                  $suspendedsql
-                                                  $departmentsql",
+                                                  $suspendedsql",
                                                   $sqlparams);
-        } else {
-            // Deal with suspended or not.
-            if (empty($row->showsuspended)) {
-                $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0";
-            } else {
-                $suspendedsql = " AND u.deleted = 0";
-            }
 
-            $cucompanysql = " cu.companyid IN (" . implode(',', array_keys($childcompanies)) .")";
-            $litcompanysql = " lit.companyid IN (" . implode(',', array_keys($childcompanies)) .")";
-
-            // Are we showing as a % of all users?
-            if ($params['showpercentage'] == 1) {
-                $totalusers = $DB->count_records_sql("SELECT count(cu.id)
-                                                      FROM {company_users} cu
-                                                      JOIN {user} u ON (cu.userid = u.id)
-                                                      WHERE $cucompanysql
-                                                      $userfilter
-                                                      $suspendedsql");
-            } else if ($params['showpercentage'] == 2) {
-                $totalusers = $DB->count_records_sql("SELECT count(DISTINCT lit.userid)
-                                                      FROM {local_iomad_track} lit
-                                                      JOIN {user} u ON (lit.userid = u.id)
-                                                      WHERE lit.courseid = :courseid
-                                                      AND $litcompanysql
-                                                      $expiredsql
-                                                      $userfilter
-                                                      $suspendedsql",
-                                                      ['courseid' => $row->id, 'runtime' => time()]);
-            }
-
-            // Deal with any search dates.
-            $datesql = "";
-            $sqlparams = array('companyid' => $company->id, 'courseid' => $row->id, 'runtime' => time());
-            if (!empty($params['from'])) {
-                $datesql = " AND (lit.timeenrolled > :enrolledfrom OR lit.timecompleted > :completedfrom ) ";
-                $sqlparams['enrolledfrom'] = $params['from'];
-                $sqlparams['completedfrom'] = $params['from'];
-            }
-            if (!empty($params['to'])) {
-                $datesql .= " AND (lit.timeenrolled < :enrolledto OR lit.timecompleted < :completedto) ";
-                $sqlparams['enrolledto'] = $params['to'];
-                $sqlparams['completedto'] = $params['to'];
-            }
-
-            // Count the enrolled users
-            $inprogress = $DB->count_records_sql("SELECT COUNT(DISTINCT lit.id)
-                                               FROM {local_iomad_track} lit
-                                               JOIN {user} u ON (lit.userid = u.id)
-                                               WHERE lit.courseid = :courseid
-                                               AND $litcompanysql
-                                               AND lit.timeenrolled IS NOT NULL
-                                               AND lit.timecompleted IS NULL
-                                               $expiredsql
-                                               $datesql
-                                               $suspendedsql",
-                                               $sqlparams);
         }
 
+        // Deal with any search dates.
+        $datesql = "";
+        if (!empty($params['from'])) {
+            $datesql = " AND (lit.timeenrolled > :enrolledfrom OR lit.timecompleted > :completedfrom ) ";
+            $sqlparams['enrolledfrom'] = $params['from'];
+            $sqlparams['completedfrom'] = $params['from'];
+        }
+        if (!empty($params['to'])) {
+            $datesql .= " AND (lit.timeenrolled < :enrolledto OR lit.timecompleted < :completedto) ";
+            $sqlparams['enrolledto'] = $params['to'];
+            $sqlparams['completedto'] = $params['to'];
+        }
+
+        // Just valid courses?
+        if ($params['validonly']) {
+            $validcompletedsql = " AND (lit.timeexpires > :validtime or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
+            $sqlparams['validtime'] = $runtime;
+        } else {
+            $validcompletedsql = "";
+        }
+
+        // Count the enrolled users
+        $started = $DB->count_records_sql("SELECT COUNT(lit.id)
+                                           FROM {local_iomad_track} lit
+                                           JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                                           JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
+                                           WHERE $litcompanysql
+                                           AND lit.courseid = :courseid
+                                           AND lit.timeenrolled IS NOT NULL
+                                           AND lit.timecompleted IS NULL
+                                           $userfilter
+                                           $datesql
+                                           $expiredsql
+                                           $suspendedsql
+                                           $departmentsql",
+                                           $sqlparams);
+
         if ($params['showpercentage'] == 0) {
-            return $inprogress;
+            return $started;
         } else {
             if (!empty($totalusers)) {
-                return get_string('percents', 'moodle', number_format($inprogress / $totalusers * 100, 2));
+                return get_string('percents', 'moodle', number_format($started / $totalusers * 100, 2));
             } else {
                 return get_string('percents', 'moodle', 0);
             }
@@ -983,158 +919,120 @@ class course_table extends table_sql {
     public function col_usercompleted($row) {
         global $output, $CFG, $USER, $DB, $params, $childcompanies;
 
+        // Set some defaults
+        if (!empty($row->islicensed)) {
+            $userfilter = " AND lit.licenseid NOT IN (SELECT id FROM {companylicense} WHERE type IN (2,3))";
+        } else {
+            $userfilter = " AND cu.educator = 0";
+        }
+        $companyuserfilter ="";
+        $departmentsql ="";
+        $cucompanysql = "cu.companyid = :companyid";
+        $litcompanysql = "lit.companyid = :companyid";
+        $runtime = time();
+
         // Deal with expired results.
-        if (empty($params['showhistoric'])) {
+        if (!empty($params['validonly'])) {
             $expiredsql = " AND (lit.timeexpires > :runtime or (lit.timecompleted IS NULL) or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
         } else {
             $expiredsql = "";
         }
 
-        // Get the company details.
-        $company = new company($row->companyid);
+        $sqlparams = ['companyid' => $row->companyid,
+                      'courseid' => $row->id,
+                      'runtime' => $runtime];
 
         // Is this rolled up or not?
         if (!$params['showsummary'] || empty($childcompanies)) {
+            // Get the company details.
+            $company = new company($row->companyid);
             $parentcompanies = $company->get_parent_companies_recursive();
 
             // Deal with parent company managers
             if (!empty($parentcompanies)) {
-                $userfilter = " AND userid NOT IN (
-                                 SELECT userid FROM {company_users}
-                                 WHERE companyid IN (" . implode(',', array_keys($parentcompanies)) . "))";
-            } else {
-                $userfilter = "";
+                $companyuserfilter = " AND cu.userid NOT IN (
+                                       SELECT userid FROM {company_users}
+                                       WHERE companyid IN (" . implode(',', array_keys($parentcompanies)) . "))";
+                $userfilter .= $companyuserfilter;
             }
 
             // Deal with department tree.
             $alldepartments = company::get_all_subdepartments($row->departmentid);
             $departmentsql = " AND cu.departmentid IN (" . join(",", array_keys($alldepartments)) . ") ";
-    
-            // Deal with suspended or not.
-            if (empty($row->showsuspended)) {
-                $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0";
-            } else {
-                $suspendedsql = " AND u.deleted = 0";
-            }
-
-            // Are we showing as a % of all users?
-            if ($params['showpercentage'] == 1) {
-                $totalusers = $DB->count_records_sql("SELECT count(cu.id)
-                                                      FROM {company_users} cu
-                                                      JOIN {user} u ON (cu.userid = u.id)
-                                                      WHERE cu.companyid = :companyid
-                                                      $departmentsql
-                                                      $userfilter
-                                                      $suspendedsql",
-                                                      array('companyid' => $company->id));
-            } else if ($params['showpercentage'] == 2) {
-                $totalusers = $DB->count_records_sql("SELECT count(DISTINCT lit.userid)
-                                                      FROM {local_iomad_track} lit
-                                                      JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                                      JOIN {department} d ON (cu.departmentid = d.id)
-                                                      JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
-                                                      WHERE lit.courseid = :courseid
-                                                      $expiredsql
-                                                      $userfilter
-                                                      $suspendedsql
-                                                      $departmentsql",
-                                                      ['courseid' => $row->id,
-                                                      'runtime' => time()]);
-            }
-
-
-            // Deal with any search dates.
-            $datesql = "";
-            $sqlparams = array('companyid' => $company->id, 'courseid' => $row->id, 'runtime' => time());
-            if (!empty($params['from'])) {
-                $datesql = " AND (lit.timeenrolled > :enrolledfrom OR lit.timecompleted > :completedfrom ) ";
-                $sqlparams['enrolledfrom'] = $params['from'];
-                $sqlparams['completedfrom'] = $params['from'];
-            }
-            if (!empty($params['to'])) {
-                $datesql .= " AND (lit.timeenrolled < :enrolledto OR lit.timecompleted < :completedto) ";
-                $sqlparams['enrolledto'] = $params['to'];
-                $sqlparams['completedto'] = $params['to'];
-            }
-
-            // Just valid courses?
-            if ($params['validonly']) {
-                $validcompletedsql = " AND (lit.timeexpires > :runtime or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
-                $sqlparams['runtime'] = time();
-            } else {
-                $validcompletedsql = "";
-            }
-
-            // Count the completed users.
-            $completed = $DB->count_records_sql("SELECT COUNT(DISTINCT lit.id)
-                                                 FROM {local_iomad_track} lit
-                                                 JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                                 JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
-                                                 WHERE lit.companyid = :companyid
-                                                 AND lit.courseid = :courseid
-                                                 AND lit.timecompleted IS NOT NULL
-                                                 $datesql
-                                                 $suspendedsql
-                                                 $validcompletedsql
-                                                 $departmentsql",
-                                                 $sqlparams);
         } else {
-            // Deal with suspended or not.
-            if (empty($row->showsuspended)) {
-                $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0";
-            } else {
-                $suspendedsql = " AND u.deleted = 0";
-            }
-
             $cucompanysql = " cu.companyid IN (" . implode(',', array_keys($childcompanies)) .")";
             $litcompanysql = " lit.companyid IN (" . implode(',', array_keys($childcompanies)) .")";
-
-            // Are we showing as a % of all users?
-            if ($params['showpercentage'] == 1) {
-                $totalusers = $DB->count_records_sql("SELECT count(cu.id)
-                                                      FROM {company_users} cu
-                                                      JOIN {user} u ON (cu.userid = u.id)
-                                                      WHERE $cucompanysql
-                                                      $userfilter
-                                                      $suspendedsql");
-            } else if ($params['showpercentage'] == 2) {
-                $totalusers = $DB->count_records_sql("SELECT count(DISTINCT lit.userid)
-                                                      FROM {local_iomad_track} lit
-                                                      JOIN {user} u ON (lit.userid = u.id)
-                                                      WHERE lit.courseid = :courseid
-                                                      AND $litcompanysql
-                                                      $expiredsql
-                                                      $userfilter
-                                                      $suspendedsql",
-                                                      ['courseid' => $row->id, 'runtime' => time()]);
-            }
-
-            // Deal with any search dates.
-            $datesql = "";
-            $sqlparams = array('companyid' => $company->id, 'courseid' => $row->id, 'runtime' => time());
-            if (!empty($params['from'])) {
-                $datesql = " AND (lit.timeenrolled > :enrolledfrom OR lit.timecompleted > :completedfrom ) ";
-                $sqlparams['enrolledfrom'] = $params['from'];
-                $sqlparams['completedfrom'] = $params['from'];
-            }
-            if (!empty($params['to'])) {
-                $datesql .= " AND (lit.timeenrolled < :enrolledto OR lit.timecompleted < :completedto) ";
-                $sqlparams['enrolledto'] = $params['to'];
-                $sqlparams['completedto'] = $params['to'];
-            }
-
-            // Count the completed users.
-            $completed = $DB->count_records_sql("SELECT COUNT(DISTINCT lit.id)
-                                                 FROM {local_iomad_track} lit
-                                                 JOIN {user} u ON (lit.userid = u.id)
-                                                 WHERE lit.courseid = :courseid
-                                                 AND  $litcompanysql
-                                                 AND lit.timecompleted IS NOT NULL
-                                                 $expiredsql
-                                                 $datesql
-                                                 $suspendedsql",
-                                                 $sqlparams);
         }
+
+        // Deal with suspended or not.
+        if (empty($row->showsuspended)) {
+            $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0";
+        } else {
+            $suspendedsql = " AND u.deleted = 0";
+        }
+
+        // Are we showing as a % of all users?
+        if ($params['showpercentage'] == 1) {
+            $totalusers = $DB->count_records_sql("SELECT COUNT(DISTINCT userid)
+                                                  FROM {company_users} cu
+                                                  JOIN {user} u ON (cu.userid = u.id AND cu.userid = u.id)
+                                                  WHERE $cucompanysql
+                                                  $departmentsql
+                                                  $companyuserfilter
+                                                  $suspendedsql",
+                                                  $sqlparams);
+
+        } else if ($params['showpercentage'] == 2) {
+            $totalusers = $DB->count_records_sql("SELECT COUNT(lit.id)
+                                                  FROM {local_iomad_track} lit
+                                                  JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                                                  JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
+                                                  WHERE $litcompanysql
+                                                  AND lit.courseid = :courseid
+                                                  $departmentsql
+                                                  $userfilter
+                                                  $expiredsql
+                                                  $suspendedsql",
+                                                  $sqlparams);
+
+        }
+
+        // Deal with any search dates.
+        $datesql = "";
+        if (!empty($params['from'])) {
+            $datesql = " AND (lit.timeenrolled > :enrolledfrom OR lit.timecompleted > :completedfrom ) ";
+            $sqlparams['enrolledfrom'] = $params['from'];
+            $sqlparams['completedfrom'] = $params['from'];
+        }
+        if (!empty($params['to'])) {
+            $datesql .= " AND (lit.timeenrolled < :enrolledto OR lit.timecompleted < :completedto) ";
+            $sqlparams['enrolledto'] = $params['to'];
+            $sqlparams['completedto'] = $params['to'];
+        }
+
+        // Just valid courses?
+        if ($params['validonly']) {
+            $validcompletedsql = " AND (lit.timeexpires > :validtime or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
+            $sqlparams['validtime'] = $runtime;
+        } else {
+            $validcompletedsql = "";
+        }
+
+        // Count the completed users.
+        $completed = $DB->count_records_sql("SELECT COUNT(lit.id)
+                                             FROM {local_iomad_track} lit
+                                             JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                                             JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
+                                             WHERE $litcompanysql
+                                             AND lit.courseid = :courseid
+                                             AND lit.timecompleted IS NOT NULL
+                                             $userfilter
+                                             $datesql
+                                             $suspendedsql
+                                             $expiredsql
+                                             $validcompletedsql
+                                             $departmentsql",
+                                             $sqlparams);
 
         if ($params['showpercentage'] == 0) {
             return $completed;
@@ -1155,6 +1053,28 @@ class course_table extends table_sql {
     public function col_usernotstarted($row) {
         global $output, $CFG, $USER, $DB, $params, $childcompanies;
 
+        if (!empty($row->islicensed)) {
+            $userfilter = " AND lit.licenseid NOT IN (SELECT id FROM {companylicense} WHERE type IN (2,3))";
+        } else {
+            $userfilter = " AND cu.educator = 0";
+        }
+        $companyuserfilter ="";
+        $departmentsql ="";
+        $cucompanysql = "cu.companyid = :companyid";
+        $litcompanysql = "lit.companyid = :companyid";
+        $runtime = time();
+
+        // Deal with expired results.
+        if (!empty($params['validonly'])) {
+            $expiredsql = " AND (lit.timeexpires > :runtime or (lit.timecompleted IS NULL) or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
+        } else {
+            $expiredsql = "";
+        }
+
+        $sqlparams = ['companyid' => $row->companyid,
+                      'courseid' => $row->id,
+                      'runtime' => $runtime];
+
         // Is this rolled up or not?
         if (!$params['showsummary'] || empty($childcompanies)) {
             // Get the company details.
@@ -1163,144 +1083,89 @@ class course_table extends table_sql {
 
             // Deal with parent company managers
             if (!empty($parentcompanies)) {
-                $userfilter = " AND userid NOT IN (
-                                 SELECT userid FROM {company_users}
-                                 WHERE companyid IN (" . implode(',', array_keys($parentcompanies)) . "))";
-            } else {
-                $userfilter = "";
+                $companyuserfilter = " AND cu.userid NOT IN (
+                                       SELECT userid FROM {company_users}
+                                       WHERE companyid IN (" . implode(',', array_keys($parentcompanies)) . "))";
+                $userfilter .= $companyuserfilter;
             }
 
             // Deal with department tree.
             $alldepartments = company::get_all_subdepartments($row->departmentid);
             $departmentsql = " AND cu.departmentid IN (" . join(",", array_keys($alldepartments)) . ") ";
-    
-            // Deal with suspended or not.
-            if (empty($row->showsuspended)) {
-                $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0";
-            } else {
-                $suspendedsql = " AND u.deleted = 0";
-            }
-
-            // Are we showing as a % of all users?
-            if ($params['showpercentage'] == 1) {
-                $totalusers = $DB->count_records_sql("SELECT count(cu.id)
-                                                      FROM {company_users} cu
-                                                      JOIN {user} u ON (cu.userid = u.id)
-                                                      WHERE cu.companyid = :companyid
-                                                      $departmentsql
-                                                      $userfilter
-                                                      $suspendedsql",
-                                                      array('companyid' => $company->id));
-            } else if ($params['showpercentage'] == 2) {
-                $totalusers = $DB->count_records_sql("SELECT count(DISTINCT lit.userid)
-                                                      FROM {local_iomad_track} lit
-                                                      JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                                      JOIN {user} u ON (lit.userid = u.id)
-                                                      WHERE lit.companyid = :companyid
-                                                      AND lit.courseid = :courseid
-                                                      $departmentsql
-                                                      $userfilter
-                                                      $suspendedsql",
-                                                      ['companyid' => $company->id,
-                                                       'courseid' => $row->id]);
-            }
-
-            // Deal with any search dates.
-            $datesql = "";
-            $sqlparams = array('companyid' => $company->id, 'courseid' => $row->id);
-            if (!empty($params['from'])) {
-                $datesql = " AND (lit.timeenrolled > :enrolledfrom OR lit.timecompleted > :completedfrom ) ";
-                $sqlparams['enrolledfrom'] = $params['from'];
-                $sqlparams['completedfrom'] = $params['from'];
-            }
-            if (!empty($params['to'])) {
-                $datesql .= " AND (lit.timeenrolled < :enrolledto OR lit.timecompleted < :completedto) ";
-                $sqlparams['enrolledto'] = $params['to'];
-                $sqlparams['completedto'] = $params['to'];
-            }
-
-            // Just valid courses?
-            if ($params['validonly']) {
-                $validcompletedsql = " AND (lit.timeexpires > :runtime or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
-                $sqlparams['runtime'] = time();
-            } else {
-                $validcompletedsql = "";
-            }
-
-            // Count the non started users.
-            $notstarted = $DB->count_records_sql("SELECT count(DISTINCT lit.id) FROM {local_iomad_track} lit
-                                                  JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                                  JOIN {user} u ON (lit.userid = u.id)
-                                                  WHERE lit.courseid = :courseid
-                                                  AND lit.companyid = :companyid
-                                                  AND lit.timeenrolled IS NULL
-                                                  $datesql
-                                                  $suspendedsql
-                                                  $departmentsql",
-                                                  $sqlparams);
         } else {
-            // Deal with suspended or not.
-            if (empty($row->showsuspended)) {
-                $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0";
-            } else {
-                $suspendedsql = " AND u.deleted = 0";
-            }
-
             $cucompanysql = " cu.companyid IN (" . implode(',', array_keys($childcompanies)) .")";
             $litcompanysql = " lit.companyid IN (" . implode(',', array_keys($childcompanies)) .")";
+        }
 
-            // Are we showing as a % of all users?
-            if ($params['showpercentage'] == 1) {
-                $totalusers = $DB->count_records_sql("SELECT count(cu.id)
-                                                      FROM {company_users} cu
-                                                      JOIN {user} u ON (cu.userid = u.id)
-                                                      WHERE $cucompanysql
-                                                      $userfilter
-                                                      $suspendedsql");
-            } else if ($params['showpercentage'] == 2) {
-                $totalusers = $DB->count_records_sql("SELECT count(DISTINCT lit.userid)
-                                                      FROM {local_iomad_track} lit
-                                                      JOIN {user} u ON (lit.userid = u.id)
-                                                      WHERE lit.courseid = :courseid
-                                                      AND $litcompanysql
-                                                      $userfilter
-                                                      $suspendedsql",
-                                                      ['courseid' => $row->id]);
-            }
+        // Deal with suspended or not.
+        if (empty($row->showsuspended)) {
+            $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0";
+        } else {
+            $suspendedsql = " AND u.deleted = 0";
+        }
 
-            // Deal with any search dates.
-            $datesql = "";
-            $sqlparams = array('companyid' => $company->id, 'courseid' => $row->id);
-            if (!empty($params['from'])) {
-                $datesql = " AND (lit.timeenrolled > :enrolledfrom OR lit.timecompleted > :completedfrom ) ";
-                $sqlparams['enrolledfrom'] = $params['from'];
-                $sqlparams['completedfrom'] = $params['from'];
-            }
-            if (!empty($params['to'])) {
-                $datesql .= " AND (lit.timeenrolled < :enrolledto OR lit.timecompleted < :completedto) ";
-                $sqlparams['enrolledto'] = $params['to'];
-                $sqlparams['completedto'] = $params['to'];
-            }
-
-            // Just valid courses?
-            if ($params['validonly']) {
-                $validcompletedsql = " AND (lit.timeexpires > :runtime or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
-                $sqlparams['runtime'] = time();
-            } else {
-                $validcompletedsql = "";
-            }
-
-            // Count the non started users.
-            $notstarted = $DB->count_records_sql("SELECT count(DISTINCT lit.id) FROM {local_iomad_track} lit
-                                                  JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                                  JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
-                                                  WHERE lit.courseid = :courseid
-                                                  AND $litcompanysql
-                                                  AND lit.timeenrolled IS NULL
-                                                  $datesql
+        // Are we showing as a % of all users?
+        if ($params['showpercentage'] == 1) {
+            $totalusers = $DB->count_records_sql("SELECT COUNT(DISTINCT userid)
+                                                  FROM {company_users} cu
+                                                  JOIN {user} u ON (cu.userid = u.id AND cu.userid = u.id)
+                                                  WHERE $cucompanysql
+                                                  $departmentsql
+                                                  $companyuserfilter
                                                   $suspendedsql",
                                                   $sqlparams);
+
+        } else if ($params['showpercentage'] == 2) {
+            $totalusers = $DB->count_records_sql("SELECT COUNT(lit.id)
+                                                  FROM {local_iomad_track} lit
+                                                  JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                                                  JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
+                                                  WHERE $litcompanysql
+                                                  AND lit.courseid = :courseid
+                                                  $departmentsql
+                                                  $userfilter
+                                                  $expiredsql
+                                                  $suspendedsql",
+                                                  $sqlparams);
+
         }
+
+
+        // Deal with any search dates.
+        $datesql = "";
+        if (!empty($params['from'])) {
+            $datesql = " AND (lit.timeenrolled > :enrolledfrom OR lit.timecompleted > :completedfrom ) ";
+            $sqlparams['enrolledfrom'] = $params['from'];
+            $sqlparams['completedfrom'] = $params['from'];
+        }
+        if (!empty($params['to'])) {
+            $datesql .= " AND (lit.timeenrolled < :enrolledto OR lit.timecompleted < :completedto) ";
+            $sqlparams['enrolledto'] = $params['to'];
+            $sqlparams['completedto'] = $params['to'];
+        }
+
+        // Just valid courses?
+        if ($params['validonly']) {
+            $validcompletedsql = " AND (lit.timeexpires > :validtime or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
+            $sqlparams['validtime'] = time();
+        } else {
+            $validcompletedsql = "";
+        }
+
+       // Count the non started users.
+        $notstarted = $DB->count_records_sql("SELECT COUNT(lit.id)
+                                              FROM {local_iomad_track} lit
+                                              JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                                              JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
+                                              WHERE lit.courseid = :courseid
+                                              AND $litcompanysql
+                                              AND lit.timeenrolled IS NULL
+                                              $userfilter
+                                              $datesql
+                                              $expiredsql
+                                              $suspendedsql
+                                              $departmentsql",
+                                              $sqlparams);
 
         if ($params['showpercentage'] == 0) {
             return $notstarted;
@@ -1318,8 +1183,31 @@ class course_table extends table_sql {
      * @param object $user the table row being output.
      * @return string HTML content to go inside the td.
      */
-    public function col_usersummary($row) {
+    public function col_neverenrolled($row) {
         global $output, $CFG, $USER, $DB, $params, $childcompanies;
+
+        // Set some defaults
+        if (!empty($row->islicensed)) {
+            $userfilter = " AND lit.licenseid NOT IN (SELECT id FROM {companylicense} WHERE type IN (2,3))";
+        } else {
+            $userfilter = " AND cu.educator = 0";
+        }
+        $companyuserfilter ="";
+        $departmentsql ="";
+        $cucompanysql = "cu.companyid = :companyid";
+        $litcompanysql = "lit.companyid = :companyid";
+        $runtime = time();
+
+        // Deal with expired results.
+        if (!empty($params['validonly'])) {
+            $expiredsql = " AND (lit.timeexpires > :runtime or (lit.timecompleted IS NULL) or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
+        } else {
+            $expiredsql = "";
+        }
+
+        $sqlparams = ['companyid' => $row->companyid,
+                      'courseid' => $row->id,
+                      'runtime' => $runtime];
 
         // Is this rolled up or not?
         if (!$params['showsummary'] || empty($childcompanies)) {
@@ -1329,198 +1217,274 @@ class course_table extends table_sql {
 
             // Deal with parent company managers
             if (!empty($parentcompanies)) {
-                $userfilter = " AND userid NOT IN (
-                                 SELECT userid FROM {company_users}
-                                 WHERE companyid IN (" . implode(',', array_keys($parentcompanies)) . "))";
-            } else {
-                $userfilter = "";
+                $companyuserfilter = " AND cu.userid NOT IN (
+                                       SELECT userid FROM {company_users}
+                                       WHERE companyid IN (" . implode(',', array_keys($parentcompanies)) . "))";
+                $userfilter .= $companyuserfilter;
             }
 
             // Deal with department tree.
             $alldepartments = company::get_all_subdepartments($row->departmentid);
             $departmentsql = " AND cu.departmentid IN (" . join(",", array_keys($alldepartments)) . ") ";
-    
-            // Deal with suspended or not.
-            if (empty($row->showsuspended)) {
-                $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0";
-            } else {
-                $suspendedsql = " AND u.deleted = 0";
-            }
-
-            // Are we showing as a % of all users?
-            if ($params['showpercentage'] == 1) {
-                $totalusers = $DB->count_records_sql("SELECT count(cu.id)
-                                                      FROM {company_users} cu
-                                                      JOIN {user} u ON (cu.userid = u.id AND cu.userid = u.id)
-                                                      WHERE cu.companyid = :companyid
-                                                      $departmentsql
-                                                      $userfilter
-                                                      $suspendedsql",
-                                                      array('companyid' => $company->id));
-            } else if ($params['showpercentage'] == 2) {
-                $totalusers = $DB->count_records_sql("SELECT count(DISTINCT lit.userid)
-                                                      FROM {local_iomad_track} lit
-                                                      JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                                      JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
-                                                      WHERE lit.companyid = :companyid
-                                                      AND lit.courseid = :courseid
-                                                      $departmentsql
-                                                      $userfilter
-                                                      $suspendedsql",
-                                                      ['companyid' => $company->id,
-                                                       'courseid' => $row->id]);
-            }
-
-            // Deal with any search dates.
-            $datesql = "";
-            $sqlparams = array('companyid' => $company->id, 'courseid' => $row->id);
-            if (!empty($params['from'])) {
-                $datesql = " AND (lit.timeenrolled > :enrolledfrom OR lit.timecompleted > :completedfrom ) ";
-                $sqlparams['enrolledfrom'] = $params['from'];
-                $sqlparams['completedfrom'] = $params['from'];
-            }
-            if (!empty($params['to'])) {
-                $datesql .= " AND (lit.timeenrolled < :enrolledto OR lit.timecompleted < :completedto) ";
-                $sqlparams['enrolledto'] = $params['to'];
-                $sqlparams['completedto'] = $params['to'];
-            }
-
-            // Just valid courses?
-            if ($params['validonly']) {
-                $validcompletedsql = " AND (lit.timeexpires > :runtime or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
-                $sqlparams['runtime'] = time();
-            } else {
-                $validcompletedsql = "";
-            }
-
-            // Count the completed users.
-            $completed = $DB->count_records_sql("SELECT COUNT(DISTINCT lit.id)
-                                                 FROM {local_iomad_track} lit
-                                                 JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                                 JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
-                                                 WHERE lit.companyid = :companyid
-                                                 AND lit.courseid = :courseid
-                                                 AND lit.timecompleted IS NOT NULL
-                                                 $datesql
-                                                 $suspendedsql
-                                                 $validcompletedsql
-                                                 $departmentsql",
-                                                 $sqlparams);
-
-            // Count the enrolled users
-            $started = $DB->count_records_sql("SELECT COUNT(DISTINCT lit.id)
-                                               FROM {local_iomad_track} lit
-                                               JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                               JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
-                                               WHERE lit.companyid = :companyid
-                                               AND lit.courseid = :courseid
-                                               AND lit.timeenrolled IS NOT NULL
-                                               AND lit.timecompleted IS NULL
-                                               $datesql
-                                               $suspendedsql
-                                               $departmentsql",
-                                               $sqlparams);
-
-            // Count the non started users.
-            $notstarted = $DB->count_records_sql("SELECT count(DISTINCT lit.id) FROM {local_iomad_track} lit
-                                                  JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                                  JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
-                                                  WHERE lit.courseid = :courseid
-                                                  AND lit.companyid = :companyid
-                                                  AND lit.timeenrolled IS NULL
-                                                  $datesql
-                                                  $suspendedsql
-                                                  $departmentsql",
-                                                  $sqlparams);
         } else {
-            // Deal with suspended or not.
-            if (empty($row->showsuspended)) {
-                $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0";
-            } else {
-                $suspendedsql = " AND u.deleted = 0";
-            }
-
             $cucompanysql = " cu.companyid IN (" . implode(',', array_keys($childcompanies)) .")";
             $litcompanysql = " lit.companyid IN (" . implode(',', array_keys($childcompanies)) .")";
-
-            // Are we showing as a % of all users?
-            if ($params['showpercentage'] == 1) {
-                $totalusers = $DB->count_records_sql("SELECT count(cu.id)
-                                                      FROM {company_users} cu
-                                                      JOIN {user} u ON (cu.userid = u.id)
-                                                      WHERE $cucompanysql
-                                                      $userfilter
-                                                      $suspendedsql");
-            } else if ($params['showpercentage'] == 2) {
-                $totalusers = $DB->count_records_sql("SELECT count(DISTINCT lit.userid)
-                                                      FROM {local_iomad_track} lit
-                                                      JOIN {user} u ON (lit.userid = u.id)
-                                                      WHERE lit.courseid = :courseid
-                                                      AND $litcompanysql
-                                                      $userfilter
-                                                      $suspendedsql",
-                                                      ['courseid' => $row->id]);
-            }
-
-            // Deal with any search dates.
-            $datesql = "";
-            $sqlparams = array('courseid' => $row->id);
-            if (!empty($params['from'])) {
-                $datesql = " AND (lit.timeenrolled > :enrolledfrom OR lit.timecompleted > :completedfrom ) ";
-                $sqlparams['enrolledfrom'] = $params['from'];
-                $sqlparams['completedfrom'] = $params['from'];
-            }
-            if (!empty($params['to'])) {
-                $datesql .= " AND (lit.timeenrolled < :enrolledto OR lit.timecompleted < :completedto) ";
-                $sqlparams['enrolledto'] = $params['to'];
-                $sqlparams['completedto'] = $params['to'];
-            }
-
-            // Just valid courses?
-            if ($params['validonly']) {
-                $validcompletedsql = " AND (lit.timeexpires > :runtime or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
-                $sqlparams['runtime'] = time();
-            } else {
-                $validcompletedsql = "";
-            }
-
-            // Count the completed users.
-            $completed = $DB->count_records_sql("SELECT COUNT(DISTINCT lit.id)
-                                                 FROM {local_iomad_track} lit
-                                                 JOIN {user} u ON (lit.userid = u.id)
-                                                 WHERE lit.courseid = :courseid
-                                                 AND  $litcompanysql
-                                                 AND lit.timecompleted IS NOT NULL
-                                                 $datesql
-                                                 $suspendedsql
-                                                 $validcompletedsql",
-                                                 $sqlparams);
-
-            // Count the enrolled users
-            $started = $DB->count_records_sql("SELECT COUNT(DISTINCT lit.id)
-                                               FROM {local_iomad_track} lit
-                                               JOIN {user} u ON (lit.userid = u.id)
-                                               WHERE lit.courseid = :courseid
-                                               AND $litcompanysql
-                                               AND lit.timeenrolled IS NOT NULL
-                                               AND lit.timecompleted IS NULL
-                                               $datesql
-                                               $suspendedsql
-                                               $validcompletedsql",
-                                               $sqlparams);
-
-            // Count the non started users.
-            $notstarted = $DB->count_records_sql("SELECT count(DISTINCT lit.id) FROM {local_iomad_track} lit
-                                                  JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
-                                                  JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
-                                                  WHERE lit.courseid = :courseid
-                                                  AND $litcompanysql
-                                                  AND lit.timeenrolled IS NULL
-                                                  $datesql
-                                                  $suspendedsql",
-                                                  $sqlparams);
         }
 
+        // Deal with suspended or not.
+        if (empty($row->showsuspended)) {
+            $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0";
+        } else {
+            $suspendedsql = " AND u.deleted = 0";
+        }
+
+        // Get the total count of users.
+        $totalusers = $DB->count_records_sql("SELECT COUNT(DISTINCT userid)
+                                              FROM {company_users} cu
+                                              JOIN {user} u ON (cu.userid = u.id AND cu.userid = u.id)
+                                              WHERE $cucompanysql
+                                              $departmentsql
+                                              $companyuserfilter
+                                              $suspendedsql",
+                                              $sqlparams);
+
+        // Deal with any search dates.
+        $datesql = "";
+        if (!empty($params['from'])) {
+            $datesql = " AND (lit.timeenrolled > :enrolledfrom OR lit.timecompleted > :completedfrom ) ";
+            $sqlparams['enrolledfrom'] = $params['from'];
+            $sqlparams['completedfrom'] = $params['from'];
+        }
+        if (!empty($params['to'])) {
+            $datesql .= " AND (lit.timeenrolled < :enrolledto OR lit.timecompleted < :completedto) ";
+            $sqlparams['enrolledto'] = $params['to'];
+            $sqlparams['completedto'] = $params['to'];
+        }
+
+        // Just valid courses?
+        if ($params['validonly']) {
+            $validcompletedsql = " AND (lit.timeexpires > :validtime or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
+            $sqlparams['validtime'] = $runtime;
+        } else {
+            $validcompletedsql = "";
+        }
+
+        // Count the completed users.
+        $completed = $DB->count_records_sql("SELECT COUNT(lit.id)
+                                             FROM {local_iomad_track} lit
+                                             JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                                             JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
+                                             WHERE $litcompanysql
+                                             AND lit.courseid = :courseid
+                                             AND lit.timecompleted IS NOT NULL
+                                             $userfilter
+                                             $datesql
+                                             $suspendedsql
+                                             $expiredsql
+                                             $validcompletedsql
+                                             $departmentsql",
+                                             $sqlparams);
+
+        // Count the enrolled users
+        $started = $DB->count_records_sql("SELECT COUNT(lit.id)
+                                           FROM {local_iomad_track} lit
+                                           JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                                           JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
+                                           WHERE $litcompanysql
+                                           AND lit.courseid = :courseid
+                                           AND lit.timeenrolled IS NOT NULL
+                                           AND lit.timecompleted IS NULL
+                                           $userfilter
+                                           $datesql
+                                           $expiredsql
+                                           $suspendedsql
+                                           $departmentsql",
+                                           $sqlparams);
+
+        // Count the non started users.
+        $notstarted = $DB->count_records_sql("SELECT COUNT(lit.id)
+                                              FROM {local_iomad_track} lit
+                                              JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                                              JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
+                                              WHERE lit.courseid = :courseid
+                                              AND $litcompanysql
+                                              AND lit.timeenrolled IS NULL
+                                              $userfilter
+                                              $datesql
+                                              $expiredsql
+                                              $suspendedsql
+                                              $departmentsql",
+                                              $sqlparams);
+        // get the rest in case we need it.
+        $remainder = $totalusers - $completed - $started - $notstarted;
+
+        if (!empty($remainder) || $DB->get_record('iomad_courses', array('courseid' => $row->id, 'licensed' => 1))) {
+            if (!empty($totalusers)) {
+                return get_string('percents', 'moodle', number_format($remainder / $totalusers * 100, 2));
+            } else {
+                return get_string('percents', 'moodle', 0);
+            }
+        }
+    }
+
+    /**
+     * Generate the display of the user's license allocated timestamp
+     * @param object $user the table row being output.
+     * @return string HTML content to go inside the td.
+     */
+    public function col_usersummary($row) {
+        global $output, $CFG, $USER, $DB, $params, $childcompanies;
+
+        // Set some defaults
+        if (!empty($row->islicensed)) {
+            $userfilter = " AND lit.licenseid NOT IN (SELECT id FROM {companylicense} WHERE type IN (2,3))";
+        } else {
+            $userfilter = " AND cu.educator = 0";
+        }
+
+        $companyuserfilter ="";
+        $departmentsql ="";
+        $cucompanysql = "cu.companyid = :companyid";
+        $litcompanysql = "lit.companyid = :companyid";
+        $runtime = time();
+
+        // Deal with expired results.
+        if (!empty($params['validonly'])) {
+            $expiredsql = " AND (lit.timeexpires > :runtime or (lit.timecompleted IS NULL) or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
+        } else {
+            $expiredsql = "";
+        }
+
+        $sqlparams = ['companyid' => $row->companyid,
+                      'courseid' => $row->id,
+                      'runtime' => $runtime];
+
+        // Is this rolled up or not?
+        if (!$params['showsummary'] || empty($childcompanies)) {
+            // Get the company details.
+            $company = new company($row->companyid);
+            $parentcompanies = $company->get_parent_companies_recursive();
+
+            // Deal with parent company managers
+            if (!empty($parentcompanies)) {
+                $companyuserfilter = " AND cu.userid NOT IN (
+                                       SELECT userid FROM {company_users}
+                                       WHERE companyid IN (" . implode(',', array_keys($parentcompanies)) . "))";
+                $userfilter .= $companyuserfilter;
+            }
+
+            // Deal with department tree.
+            $alldepartments = company::get_all_subdepartments($row->departmentid);
+            $departmentsql = " AND cu.departmentid IN (" . join(",", array_keys($alldepartments)) . ") ";
+        } else {
+            $cucompanysql = " cu.companyid IN (" . implode(',', array_keys($childcompanies)) .")";
+            $litcompanysql = " lit.companyid IN (" . implode(',', array_keys($childcompanies)) .")";
+        }
+
+        // Deal with suspended or not.
+        if (empty($row->showsuspended)) {
+            $suspendedsql = " AND u.suspended = 0 AND u.deleted = 0";
+        } else {
+            $suspendedsql = " AND u.deleted = 0";
+        }
+
+        // Are we showing as a % of all users?
+        if ($params['showpercentage'] == 1) {
+            $totalusers = $DB->count_records_sql("SELECT COUNT(DISTINCT userid)
+                                                  FROM {company_users} cu
+                                                  JOIN {user} u ON (cu.userid = u.id AND cu.userid = u.id)
+                                                  WHERE $cucompanysql
+                                                  $departmentsql
+                                                  $companyuserfilter
+                                                  $suspendedsql",
+                                                  $sqlparams);
+
+        } else if ($params['showpercentage'] == 2) {
+            $totalusers = $DB->count_records_sql("SELECT COUNT(lit.id)
+                                                  FROM {local_iomad_track} lit
+                                                  JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                                                  JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
+                                                  WHERE $litcompanysql
+                                                  AND lit.courseid = :courseid
+                                                  $departmentsql
+                                                  $userfilter
+                                                  $expiredsql
+                                                  $suspendedsql",
+                                                  $sqlparams);
+
+        } else {
+            $totalusers = 1;
+        }
+
+        // Deal with any search dates.
+        $datesql = "";
+        if (!empty($params['from'])) {
+            $datesql = " AND (lit.timeenrolled > :enrolledfrom OR lit.timecompleted > :completedfrom ) ";
+            $sqlparams['enrolledfrom'] = $params['from'];
+            $sqlparams['completedfrom'] = $params['from'];
+        }
+        if (!empty($params['to'])) {
+            $datesql .= " AND (lit.timeenrolled < :enrolledto OR lit.timecompleted < :completedto) ";
+            $sqlparams['enrolledto'] = $params['to'];
+            $sqlparams['completedto'] = $params['to'];
+        }
+
+        // Just valid courses?
+        if ($params['validonly']) {
+            $validcompletedsql = " AND (lit.timeexpires > :validtime or (lit.timecompleted > 0 AND lit.timeexpires IS NULL))";
+            $sqlparams['validtime'] = $runtime;
+        } else {
+            $validcompletedsql = "";
+        }
+
+        // Count the completed users.
+        $completed = $DB->count_records_sql("SELECT COUNT(lit.id)
+                                             FROM {local_iomad_track} lit
+                                             JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                                             JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
+                                             WHERE $litcompanysql
+                                             AND lit.courseid = :courseid
+                                             AND lit.timecompleted IS NOT NULL
+                                             $userfilter
+                                             $datesql
+                                             $suspendedsql
+                                             $expiredsql
+                                             $validcompletedsql
+                                             $departmentsql",
+                                             $sqlparams);
+
+        // Count the enrolled users
+        $started = $DB->count_records_sql("SELECT COUNT(lit.id)
+                                           FROM {local_iomad_track} lit
+                                           JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                                           JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
+                                           WHERE $litcompanysql
+                                           AND lit.courseid = :courseid
+                                           AND lit.timeenrolled IS NOT NULL
+                                           AND lit.timecompleted IS NULL
+                                           $userfilter
+                                           $datesql
+                                           $expiredsql
+                                           $suspendedsql
+                                           $departmentsql",
+                                           $sqlparams);
+
+        // Count the non started users.
+        $notstarted = $DB->count_records_sql("SELECT COUNT(lit.id)
+                                              FROM {local_iomad_track} lit
+                                              JOIN {company_users} cu ON (lit.userid = cu.userid AND lit.companyid = cu.companyid)
+                                              JOIN {user} u ON (lit.userid = u.id AND cu.userid = u.id)
+                                              WHERE lit.courseid = :courseid
+                                              AND $litcompanysql
+                                              AND lit.timeenrolled IS NULL
+                                              $userfilter
+                                              $datesql
+                                              $expiredsql
+                                              $suspendedsql
+                                              $departmentsql",
+                                              $sqlparams);
+        // get the rest in case we need it.
+        $remainder = $totalusers - $completed - $started - $notstarted;
         if (!$this->is_downloading()) {
             $enrolledchart = new \core\chart_pie();
             $enrolledchart->set_doughnut(true); // Calling set_doughnut(true) we display the chart as a doughnut.
@@ -1531,21 +1495,43 @@ class course_table extends table_sql {
                                              get_string('inprogressusers', 'local_report_completion') . " (" . $started . ")",
                                              get_string('notstartedusers', 'local_report_completion') . " (" . $notstarted . ")"));
             } else {
-                $completed = number_format($completed / $totalusers * 100, 2);
-                $started = number_format($started / $totalusers * 100, 2);
-                $notstarted = number_format($notstarted / $totalusers * 100, 2);
-                $enrolledseries = new \core\chart_series('', array($completed, $started, $notstarted));
+                $completed = !empty($totalusers) ? number_format($completed / $totalusers * 100, 2) : 0;
+                $started = !empty($totalusers) ? number_format($started / $totalusers * 100, 2) : 0;
+                $notstarted = !empty($totalusers) ? number_format($notstarted / $totalusers * 100, 2) : 0;
+                $remainder = !empty($totalusers) ? number_format($remainder / $totalusers * 100, 2) : 0;
+                $seriesarray = [$completed, $started, $notstarted];
+                $labelarray = [get_string('completedusers', 'local_report_completion') . " (" .$completed . "%)",
+                               get_string('inprogressusers', 'local_report_completion') . " (" . $started . "%)",
+                               get_string('notstartedusers', 'local_report_completion') . " (" . $notstarted . "%)"];
+                if ($params['showpercentage'] == 1) {
+                    $seriesarray[] = $remainder;
+                    $labelarray[] = get_string('neverenrolled', 'local_report_completion') . "(" . $remainder ."%)";
+                }
+                $enrolledseries = new \core\chart_series('', $seriesarray);
                 $enrolledchart->add_series($enrolledseries);
-                $enrolledchart->set_labels(array(get_string('completedusers', 'local_report_completion') . " (" .$completed . "%)",
-                                             get_string('inprogressusers', 'local_report_completion') . " (" . $started . "%)",
-                                             get_string('notstartedusers', 'local_report_completion') . " (" . $notstarted . "%)"));
+                $enrolledchart->set_labels($labelarray);
             }
-            $CFG->chart_colorset= ['green', '#1177d1', '#d9534f'];
+            $CFG->chart_colorset= ['green', '#1177d1', '#d9534f', 'darkgrey'];
             return $output->render($enrolledchart, false);
         } else {
-            return get_string('completedusers', 'local_report_completion') . " = $completed\n" .
-                   get_string('inprogressusers', 'local_report_completion') . " = $started\n" .
-                   get_string('notstartedusers', 'local_report_completion') . " = $notstarted\n";
+            if ($params['showpercentage'] == 0) {
+                return get_string('completedusers', 'local_report_completion') . " = $completed\n" .
+                       get_string('inprogressusers', 'local_report_completion') . " = $started\n" .
+                       get_string('notstartedusers', 'local_report_completion') . " = $notstarted\n";
+            } else {
+                $remainderstring = "";
+                $completed = !empty($totalusers) ? number_format($completed / $totalusers * 100, 2) : 0;
+                $started = !empty($totalusers) ? number_format($started / $totalusers * 100, 2) : 0;
+                $notstarted = !empty($totalusers) ? number_format($notstarted / $totalusers * 100, 2) : 0;
+                $remainder = !empty($totalusers) ? number_format($remainder / $totalusers * 100, 2) : 0;
+                if ($params['showpercentage'] == 1) {
+                    $remainderstring = get_string('neverenrolled', 'local_report_completion') . " = " . $remainder ."%\n";
+                }
+                return get_string('completedusers', 'local_report_completion') . " = " . $completed . "%\n" .
+                       get_string('inprogressusers', 'local_report_completion') . " = " . $started . "%\n" .
+                       get_string('notstartedusers', 'local_report_completion') . " = " . $notstarted ."%\n" .
+                       $remainderstring;
+            }
         }
     }
 
@@ -1560,7 +1546,7 @@ class course_table extends table_sql {
         global $DB;
         if (!$this->is_downloading()) {
             if ($this->countsql === NULL) {
-                $this->countsql = 'SELECT courseid FROM '.$this->sql->from.' WHERE '.$this->sql->where;
+                $this->countsql = 'SELECT lit.courseid FROM '.$this->sql->from.' WHERE '.$this->sql->where;
                 $this->countparams = $this->sql->params;
             }
             $subgrandtotal = $DB->get_records_sql($this->countsql, $this->countparams);

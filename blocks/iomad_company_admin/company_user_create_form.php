@@ -88,10 +88,26 @@ if ($mform->is_cancelled()) {
     $crowdauth = get_auth_plugin('crowd');
     $crowduser = $crowdauth->get_userinfo($data->email);
 
-    if ($crowduser) {
-        // Trim first and lastnames
-        //$data->firstname = trim($data->firstname);
-        //$data->lastname = trim($data->lastname);
+    // we dont want to pass a department id right now - we assign any later on.
+    $departmentid = $data->deptid;
+    unset($data->departmentid);
+    unset($data->deptid);
+
+    // Company managers can't be added to a specified department.
+    if ($data->managertype == 1) {
+        $parentdepartment = company::get_company_parentnode($companyid);
+        $departmentid = $parentdepartment->id;
+    }
+
+    if (!$userid = company_user::create($data)) {
+        $this->verbose("Error inserting a new user in the database!");
+        if (!$this->get('ignore_errors')) {
+            die();
+        }
+    }
+    $user = new stdclass();
+    $user->id = $userid;
+    $data->id = $userid;
 
         // *** Add data from crowd ***
         $data->firstname = $crowduser['firstname'];
@@ -101,9 +117,23 @@ if ($mform->is_cancelled()) {
         $data->idnumber = $crowduser['idnumber'];
         $data->auth = "crowd";
 
-        $data->userid = $USER->id;
-        if ($companyid > 0) {
-            $data->companyid = $companyid;
+    // Process any department moves or promotions.
+    company::upsert_company_user($userid, $companyid, $departmentid, $data->managertype, $data->educator, false, true);
+
+    // Enrol the user on the courses.
+    if (!empty($createcourses)) {
+        $userdata = $DB->get_record('user', array('id' => $userid));
+        company_user::enrol($userdata, $createcourses, $companyid);
+    }
+    // Assign and licenses.
+    if (!empty($licenseid)) {
+        $licenserecord = (array) $DB->get_record('companylicense', array('id' => $licenseid));
+        if (!empty($licenserecord['program'])) {
+            // If so the courses are not passed automatically.
+            $data->licensecourses =  $DB->get_records_sql_menu("SELECT c.id, clc.courseid FROM {companylicense_courses} clc
+                                                                   JOIN {course} c ON (clc.courseid = c.id
+                                                                   AND clc.licenseid = :licenseid)",
+                                                                   array('licenseid' => $licenserecord['id']));
         }
 
         if (!$userid = company_user::create($data)) {

@@ -873,6 +873,8 @@ class external extends external_api {
 
         $context = context_system::instance();
         self::validate_context($context);
+        require_capability('moodle/competency:templatemanage', $context);
+
         $output = $PAGE->get_renderer('tool_lp');
 
         list($filtercapsql, $filtercapparams) = api::filter_users_with_capability_on_user_context_sql($cap,
@@ -886,9 +888,41 @@ class external extends external_api {
         list($wheresql, $whereparams) = users_search_sql($query, 'u', true, $extrasearchfields);
         list($sortsql, $sortparams) = users_order_by_sql('u', $query, $context);
 
-        $countsql = "SELECT COUNT('x') FROM {user} u WHERE $wheresql AND u.id $filtercapsql";
+        // IOMAD
+        $systemcontext = context_system::instance();
+
+        // Set the companyid
+        if (\iomad::has_capability('block/iomad_company_admin:company_view_all', $systemcontext)) {
+            $companysql = "";
+            $companyusql = "";
+        } else {
+            $companysql = " AND 1=2";
+            $companyusql = " AND 1=2";
+        }
+        $companyid = \iomad::get_my_companyid($systemcontext);
+        if ($companyid > 0) {
+            $companycontext = $systemcontext;
+            $company = new \company($companyid);
+            $userlevel = $company->get_userlevel($USER);
+            $departmentid = key($userlevel);
+            $departmentusers = \company::get_recursive_department_users($departmentid);
+            if (!empty($departmentusers)) {
+                $departmentids = "";
+                foreach ($departmentusers as $departmentuser) {
+                    if (!empty($departmentids)) {
+                        $departmentids .= ",".$departmentuser->userid;
+                    } else {
+                        $departmentids .= $departmentuser->userid;
+                    }
+                }
+                $companysql = " AND id IN ($departmentids) ";
+                $companyusql = " AND u.id IN ($departmentids) ";
+            }
+        }
+
+        $countsql = "SELECT COUNT('x') FROM {user} u WHERE $wheresql $companysql AND u.id $filtercapsql";
         $countparams = $whereparams + $filtercapparams;
-        $sql = "SELECT $fields FROM {user} u WHERE $wheresql AND u.id $filtercapsql ORDER BY $sortsql";
+        $sql = "SELECT $fields FROM {user} u WHERE $wheresql $companyusql AND u.id $filtercapsql ORDER BY $sortsql";
         $params = $whereparams + $filtercapparams + $sortparams;
 
         $count = $DB->count_records_sql($countsql, $countparams);

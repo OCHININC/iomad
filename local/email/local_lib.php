@@ -112,6 +112,7 @@ class local_email {
                             'course_not_started_warning',
                             'expire',
                             'expire_manager',
+                            'expiring_digest_manager',
                             'expiry_warn_manager',
                             'expiry_warn_user',
                             'invoice_ordercomplete',
@@ -140,7 +141,8 @@ class local_email {
                             'user_signed_up_for_event_teacher',
                             'user_signed_up_to_waitlist',
                             'user_suspended',
-                            'user_unsuspended');
+                            'user_unsuspended',
+                            'warning_digest_manager');
 
         // Set up the email template array.
         foreach ($emailarray as $templatename) {

@@ -56,7 +56,10 @@ class company_ccu_courses_form extends company_moodleform {
                          'licenses' => false,
                          'shared' => false);
         $this->companycourses = $this->company->get_menu_courses(true, true);
-        $this->companycourses[0] = get_string('all');
+        unset($this->companycourses[0]);
+        if (!empty($this->companycourses) && count($this->companycourses) > 1) {
+            $this->companycourses[0] = get_string('all');
+        }
 
         parent::__construct($actionurl);
     }
@@ -85,7 +88,7 @@ class company_ccu_courses_form extends company_moodleform {
                                  'onchange' => 'this.form.submit()');
             $mform->addElement('autocomplete', 'selectedcourses', get_string('selectenrolmentcourse', 'block_iomad_company_admin'), $this->companycourses, $autooptions);
         } else {
-            $mform->addElement('html', '<div class="alert alert-warning">' . get_string('nocourses', 'block_iomad_company_admin') . '</div>');
+            $mform->addElement('html', '<div class="alert alert-warning">' . get_string('noenrolmentcourses', 'block_iomad_company_admin') . '</div>');
         }
 
         // Disable the onchange popup.

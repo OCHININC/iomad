@@ -468,5 +468,18 @@ function xmldb_block_iomad_commerce_upgrade($oldversion) {
         upgrade_block_savepoint(true, 2023021901, 'iomad_commerce');
     }
 
+    if ($oldversion < 2024112400) {
+
+        // Changing precision of field name on table course_shopsettings to (254).
+        $table = new xmldb_table('course_shopsettings');
+        $field = new xmldb_field('name', XMLDB_TYPE_CHAR, '254', null, XMLDB_NOTNULL, null, null, 'companyid');
+
+        // Launch change of precision for field name.
+        $dbman->change_field_precision($table, $field);
+
+        // Iomad_commerce savepoint reached.
+        upgrade_block_savepoint(true, 2024112400, 'iomad_commerce');
+    }
+
     return $result;
 }

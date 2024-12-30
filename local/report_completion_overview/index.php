@@ -452,6 +452,9 @@ if (!$bycourse) {
 
 if (!$bycourse) {
     foreach ($courses as $courseid => $junk) {
+        if (empty($allcompanycourses[$courseid])) {
+            continue;
+        }
         if (!$download) {
             $headers[] = html_writer::tag('a', $allcompanycourses[$courseid], ['href' => new moodle_url($CFG->wwwroot . '/local/report_completion/index.php', ['courseid' => $courseid])]);
             $columns[] = "c" . $courseid . "coursename";
@@ -526,6 +529,9 @@ if (!$bycourse) {
     foreach ($userlist as $userid => $user) {
         $usercourses = [];
         foreach ($courses as $courseid => $junk) {
+            if (empty($allcompanycourses[$courseid])) {
+                continue;
+            }
             if ($comprecord = $DB->get_record_sql($coursedetailsql, ['userid' => $userid, 'courseid' => $courseid])) {
                 $comprecord->indate = false;
                 $comprecord->outdate = false;

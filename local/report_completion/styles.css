@@ -108,3 +108,10 @@
 .iomadusersearchform .mform .form-inline .custom-select {
     max-width:75%;
 }
+
+.coursestats {
+    font-weight: bold;
+    padding-right: 15px;
+    display: flex;
+    align-items: center;
+}

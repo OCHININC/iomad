@@ -44,6 +44,7 @@ $services = array(
             'block_iomad_company_admin_get_department_users',
             'block_iomad_company_admin_get_license_from_id',
             'block_iomad_company_admin_get_license_info',
+            'block_iomad_company_admin_get_user_companies',
             'block_iomad_company_admin_move_users',
             'block_iomad_company_admin_restrict_capability',
             'block_iomad_company_admin_unallocate_liceses',
@@ -193,6 +194,13 @@ $functions = array(
         'classpath' => 'blocks/iomad_company_admin/externallib.php',
         'description' => 'Get company license information',
         'type' => 'write',
+    ),
+    'block_iomad_company_admin_get_user_companies' => array(
+        'classname' => 'block_iomad_company_admin_external',
+        'methodname' => 'get_user_companies',
+        'classpath' => 'blocks/iomad_company_admin/externallib.php',
+        'description' => 'Get user company information',
+        'type' => 'read',
     ),
     'block_iomad_company_admin_move_users' => array(
         'classname' => 'block_iomad_company_admin_external',

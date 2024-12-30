@@ -53,7 +53,7 @@ $coursecontext = context_course::instance($course->id);
 $usercontext   = context_user::instance($user->id, IGNORE_MISSING);
 
 // Check we are not trying to view guest's profile.
-if (isguestuser($user)) {
+if (isguestuser($user) || !company::check_can_manage($user->id)) {
     // Can not view profile of guest - thre is nothing to see there.
     throw new \moodle_exception('invaliduserid');
 }

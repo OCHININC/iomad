@@ -192,7 +192,7 @@ class company_user {
 
         // Deal with auto enrolments.
         if ($CFG->local_iomad_signup_autoenrol) {
-            $company->autoenrol($user);
+            $company->autoenrol($user, $data->due);
         }
 
         return $user->id;

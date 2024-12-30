@@ -776,6 +776,12 @@ function initialise_cfg() {
         return;
     }
 
+    foreach ($localcfg as $name => $value) {
+        // Note that get_config() keeps forced settings
+        // and normalises values to string if possible.
+        $CFG->{$name} = $value;
+    }
+
     // IOMAD - Set the theme if the server hostname matches one of ours.
     if(!CLI_SCRIPT && !during_initial_install()){
         $CFG->wwwrootdefault = $CFG->wwwroot;
@@ -787,13 +793,13 @@ function initialise_cfg() {
 
             // Set the wwwroot to the company one using the same protocol.
             $CFG->wwwroot  = $company->get_wwwroot();
-        }
-    }
 
-    foreach ($localcfg as $name => $value) {
-        // Note that get_config() keeps forced settings
-        // and normalises values to string if possible.
-        $CFG->{$name} = $value;
+            // Do we have session set up?
+            if (empty($SESSION->currenteditingcompany)) {
+                // Cant set SESSION here - stash this in CFG.
+                $CFG->foundcompanyid = $companyid;
+            }
+        }
     }
 }
 

@@ -370,7 +370,8 @@ class base {
             $PAGE->set_pagelayout('standard');
             $USER->editing = false;
 
-            $ucptitle = get_string('ucp_disconnect_title', 'auth_iomadoidc', $this->config->opname);
+            $opname = "opname" . $this->postfix;
+            $ucptitle = get_string('ucp_disconnect_title', 'auth_iomadoidc', $this->config->$opname);
             $PAGE->navbar->add($ucptitle, $PAGE->url);
             $PAGE->set_title($ucptitle);
 

@@ -932,7 +932,7 @@ class company {
         $params['companyid'] = $this->id;
         $params['companyidforjoin'] = $this->id;
 
-        $sql = " SELECT u.id, u.id AS mid
+        $sql = " SELECT u.id, u.id AS mid, u.lastname, u.firstname
                 FROM
                     {company_users} cu
                     INNER JOIN {user} u ON (cu.userid = u.id)
@@ -958,7 +958,7 @@ class company {
         $params['companyid'] = $this->id;
         $params['companyidforjoin'] = $this->id;
 
-        $sql = " SELECT DISTINCT u.id, u.id AS mid
+        $sql = " SELECT DISTINCT u.id, u.id AS mid, u.lastname, u.firstname
                 FROM
                     {company_users} cu
                     INNER JOIN {user} u ON (cu.userid = u.id)
@@ -2166,10 +2166,19 @@ class company {
      * Returns array()
      *
      **/
-    public static function get_all_subdepartments($parentnodeid, $addchildcompanies = true) {
+    public static function get_all_subdepartments($parentnodeid, $addchildcompanies = false) {
+        global $PAGE;
+
+        // format_string() references $PAGE context so nee to set that if it's not already set.
+        $options = [];
+        if (empty($PAGE->context)) {
+            // format string needs the context.
+            $options['context'] = context_system::instance();
+        }
+
         $parentnode = self::get_departmentbyid($parentnodeid);
         $parentlist = array();
-        $parentlist[$parentnodeid] = format_string($parentnode->name);
+        $parentlist[$parentnodeid] = format_string($parentnode->name, true, $options);
         $departmenttree = self::get_subdepartments($parentnode);
         if ($addchildcompanies) {
             $currentcompany = new company($parentnode->company);
@@ -2177,7 +2186,7 @@ class company {
                 foreach ($childcompanies as $childcompany) {
                     $childnode = self::get_company_parentnode($childcompany->id);
                     $childtree = self::get_subdepartments($childnode);
-                    $childlist[$childnode->id] = format_string($childnode->name);
+                    $childlist[$childnode->id] = format_string($childnode->name, true, $options);
                     $departmenttree->children[] = $childtree;
                     
                 }
@@ -2185,7 +2194,7 @@ class company {
         }
 
         $departmentlist = self::array_flatten($parentlist +
-                                              self::get_department_list($departmenttree));
+                          self::get_department_list($departmenttree));
 
         return $departmentlist;
     }
@@ -2809,7 +2818,7 @@ class company {
         return false;
     }
 
-    public function get_menu_courses($shared = false, $licensed = false, $groups = false, $default = true, $onlylicensed = false) {
+    public function get_menu_courses($shared = false, $licensed = false, $groups = false, $default = true, $onlylicensed = false, $noncompany = false) {
         global $DB;
 
         // Deal with license option.
@@ -2858,6 +2867,17 @@ class company {
             $groupsql = "";
         }
 
+        // Deal with any courses which don't belong to any company.
+        $noncompanysql = "";
+        if ($noncompany) {
+            $noncompanysql = " OR
+                               c.id IN (
+                                  SELECT id FROM {course}
+                                  WHERE id NOT IN (
+                                      SELECT courseid FROM {company_course}
+                                  )
+                              )";
+        }
         // Get the courses.
         $retcourses = $DB->get_records_sql_menu("SELECT c.id, c.fullname
                                                  FROM {course} c
@@ -2870,6 +2890,7 @@ class company {
                                                      WHERE companyid = :companyid
                                                  )
                                                  $sharedsql
+                                                 $noncompanysql
                                                  ORDER BY c.fullname",
                                                  array('companyid' => $this->id,
                                                        'companyid2' => $this->id));
@@ -3460,7 +3481,7 @@ class company {
 
         $context = context_system::instance();
         // If current user is a site admin or they have appropriate capabilities then they can.
-        if (is_siteadmin($USER->id) ||
+        if (is_siteadmin($userid) ||
             iomad::has_capability('block/iomad_company_admin:company_add', $context)) {
             return true;
         }
@@ -3476,7 +3497,7 @@ class company {
             // is the user in a child company?
             $company = new company($companyid);
             $children = $company->get_child_companies_recursive();
-            if (!empty($childred) &&
+            if (!empty($children) &&
                 $DB->get_records_sql("SELECT id FROM {company_users}
                                       WHERE userid = :userid
                                       and companyid IN (" . join(',', array_keys($children)) . ")",
@@ -3687,7 +3708,7 @@ class company {
      *              $user = stdclass();
      *
      **/
-    public function autoenrol($user) {
+    public function autoenrol($user, $due = 0) {
         global $DB, $CFG, $SESSION, $SITE, $OUTPUT;
 
         // Did we get passed a user id?
@@ -3737,7 +3758,7 @@ class company {
                         // Create an event.
                         $eventother = array('licenseid' => $newlicense->licenseid,
                                             'issuedate' => time(),
-                                            'duedate' => 0);
+                                            'duedate' => $due);
                         $event = \block_iomad_company_admin\event\user_license_assigned::create(array('context' => context_course::instance($course->id),
                                                                                                       'objectid' => $newlicense->id,
                                                                                                       'courseid' => $course->id,
@@ -3748,7 +3769,7 @@ class company {
                         $errors .= format_string($course->fullname) . " ";
                     }
                 } else {
-                    company_user::enrol($user, array($course->id));
+                    company_user::enrol($user, array($course->id), $this->id, false, false, $due);
                 }
             }
         }
@@ -4578,6 +4599,7 @@ class company {
         $license = new stdclass();
         $license->length = $licenserecord->validlength;
         $license->valid = date($CFG->iomad_date_format, $licenserecord->expirydate);
+        $license->startdate = date($CFG->iomad_date_format, $licenserecord->startdate);
 
         if (!$noemail) {
         // Send out the email.
@@ -4950,10 +4972,20 @@ class company {
         // Deal with any children.
         if ($children = $DB->get_records('companylicense', array('parentid' => $licenseid))) {
             foreach ($children as $child) {
-                // Clear down all of them initially.
-                $DB->delete_records('companylicense_courses', array('licenseid' => $child->id));
-                if (!empty($currentcourses)) {
-                    // Add the course license allocations.
+                // If not a program of courses, check if child courses are all still present in parent courses
+                if (!empty($currentcourses) && empty($licenserecord->program)) {
+                    $childcourses = $DB->get_records('companylicense_courses', array('licenseid' => $child->id), '', 'courseid');
+                    $childparentcourses = array_intersect_key($childcourses, $currentcourses);
+                    // Clear down all of them initially.
+                    $DB->delete_records('companylicense_courses', array('licenseid' => $child->id));
+                    foreach ($childparentcourses as $selectedcourse) {
+                        $DB->insert_record('companylicense_courses', array('licenseid' => $child->id, 'courseid' => $selectedcourse->courseid));
+                    }
+                }
+                // If parent license is for a program of courses, overwrite child license with parent course license allocations.
+                if (!empty($currentcourses) && !empty($licenserecord->program)) {
+                    // Clear down all of them initially.
+                    $DB->delete_records('companylicense_courses', array('licenseid' => $child->id));
                     foreach ($currentcourses as $selectedcourse) {
                         $DB->insert_record('companylicense_courses', array('licenseid' => $child->id, 'courseid' => $selectedcourse->courseid));
                     }

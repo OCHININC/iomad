@@ -40,6 +40,11 @@ if (!isloggedin()) {
     redirect(get_login_url());
 }
 
+// Check if we can see this course.
+if (!iomad::iomad_check_course($id)) {
+	$id = 0;
+}
+
 $course = $DB->get_record('course', array('id'=>$id), '*', MUST_EXIST);
 $context = context_course::instance($course->id, MUST_EXIST);
 

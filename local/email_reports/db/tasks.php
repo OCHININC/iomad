@@ -55,7 +55,25 @@ $tasks = [
         'dayofweek' => '*'
     ],
     [
-        'classname' => 'local_email_reports\task\manager_digest_task',
+        'classname' => 'local_email_reports\task\manager_completion_digest_task',
+        'blocking' => 0,
+        'minute' => '0',
+        'hour' => '0',
+        'day' => '*',
+        'month' => '*',
+        'dayofweek' => '*'
+    ],
+    [
+        'classname' => 'local_email_reports\task\manager_expiring_digest_task',
+        'blocking' => 0,
+        'minute' => '0',
+        'hour' => '0',
+        'day' => '*',
+        'month' => '*',
+        'dayofweek' => '*'
+    ],
+    [
+        'classname' => 'local_email_reports\task\manager_warning_digest_task',
         'blocking' => 0,
         'minute' => '0',
         'hour' => '0',

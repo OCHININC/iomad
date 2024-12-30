@@ -27,7 +27,7 @@ use \EmailTemplate;
 use \company;
 use \context_course;
 
-class manager_digest_task extends \core\task\scheduled_task {
+class manager_completion_digest_task extends \core\task\scheduled_task {
 
     /**
      * Get a descriptive name for this task (shown to admins).
@@ -35,7 +35,7 @@ class manager_digest_task extends \core\task\scheduled_task {
      * @return string
      */
     public function get_name() {
-        return get_string('manager_digest_task', 'local_email_reports');
+        return get_string('manager_completion_digest_task', 'local_email_reports');
     }
 
     /**
@@ -108,22 +108,31 @@ class manager_digest_task extends \core\task\scheduled_task {
                         $departmentids .= $departmentuser->userid;
                     }
                 }
-                $managerusers = $DB->get_records_sql("SELECT u.id AS userid, u.firstname, u.lastname, u.email, c.id AS courseid, c.fullname, cc.timecompleted, d.name AS departmentname
-                                                      FROM {course_completions} cc
+
+                // Send course completion digest email.
+                $managerusers = $DB->get_records_sql("SELECT cc.id,
+                                                      u.id AS userid,
+                                                      u.firstname,
+                                                      u.lastname,
+                                                      u.email,
+                                                      c.id AS courseid,
+                                                      c.fullname,
+                                                      cc.timecompleted
+                                                      FROM {local_iomad_track} cc
                                                       JOIN {user} u ON (cc.userid = u.id)
-                                                      JOIN {course} c ON (cc.course = c.id)
+                                                      JOIN {course} c ON (cc.courseid = c.id)
                                                       JOIN {company_users} cu ON (u.id = cu.userid)
-                                                      JOIN {department} d ON (cu.departmentid = d.id)
                                                       WHERE c.visible = 1
                                                       AND cc.userid IN (" . $departmentids . ")
                                                       AND cc.userid != :managerid
                                                       $companysql
                                                       AND cc.timecompleted > :weekago",
                                                       array('managerid' => $manager->userid, 'weekago' => $runtime - (60 * 60 * 24 * 7)));
+
                 $summary = "<table><tr><th>" . get_string('firstname') . "</th>" .
                            "<th>" . get_string('lastname') . "</th>" .
                            "<th>" . get_string('email') . "</th>" .
-                           "<th>" . get_string('department', 'block_iomad_company_admin') ."</th>";
+                           "<th>" . get_string('department', 'block_iomad_company_admin') ."</th>" .
                            "<th>" . get_string('course') . "</th>" .
                            "<th>" . get_string('completed', 'local_report_completion') ."</th></tr>";
                 $foundusers = false;
@@ -139,45 +148,37 @@ class manager_digest_task extends \core\task\scheduled_task {
                         continue;
                     }
 
-                    $summary = "<table><tr><th>" . get_string('firstname') . "</th>" .
-                               "<th>" . get_string('lastname') . "</th>" .
-                               "<th>" . get_string('email') . "</th>" .
-                               "<th>" . get_string('department', 'block_iomad_company_admin') ."</th>";
-                               "<th>" . get_string('course') . "</th>" .
-                               "<th>" . get_string('completed', 'local_report_completion') ."</th></tr>";
-                    if ($managerusers = $DB->get_records_sql("SELECT u.firstname, u.lastname, u.email, c.fullname, cc.timecompleted
-                                                              FROM {course_completions} cc
-                                                              JOIN {user} u ON (cc.userid = u.id)
-                                                              JOIN {course} c ON (cc.course = c.id)
-                                                              WHERE c.visible = 1
-                                                              AND cc.userid IN (" . $departmentids . ")
-                                                              AND cc.timecompleted > :weekago",
-                                                              array('weekago' => $runtime - (60 * 60 * 24 * 7)))) {
-                        foreach ($managerusers as $manageruser) {
-                            $datestring = date($CFG->iomad_date_format, $manageruser->timecompleted) . "\n";
+                    $datestring = date($CFG->iomad_date_format, $manageruser->timecompleted) . "\n";
+                    $foundusers = true;
+                    // Get the user's departments.
+                    $userdepartments = $DB->get_records_sql("SELECT DISTINCT d.name
+                                                             FROM {department} d 
+                                                             JOIN {company_users} cu ON (d.id = cu.departmentid AND d.company = cu.companyid)
+                                                             WHERE cu.userid = :userid
+                                                             AND cu.companyid = :companyid",
+                                                             ['userid' => $manageruser->userid,
+                                                              'companyid' => $company->id]);
+                    $userdepartmentstext = implode(',<br>', array_keys($userdepartments));
 
-                            $summary .= "<tr><td>" . $manageruser->firstname . "</td>" .
-                                        "<td>" . $manageruser->lastname . "</td>" .
-                                        "<td>" . $manageruser->email . "</td>" .
-                                        "<td>" . $manageruser->departmentname . "</td>" .
-                                        "<td>" . $manageruser->fullname . "</td>" .
-                                        "<td>" . $datestring . "</td></tr>";
-                        }
-                        $summary .= "</table>";
+                    $summary .= "<tr><td>" . $manageruser->firstname . "</td>" .
+                                "<td>" . $manageruser->lastname . "</td>" .
+                                "<td>" . $manageruser->email . "</td>" .
+                                "<td>" . $userdepartmentstext . "</td>" .
+                                "<td>" . $manageruser->fullname . "</td>" .
+                                "<td>" . $datestring . "</td></tr>";
+                }
+                $summary .= "</table>";
 
-                        if ($foundusers && $user = $DB->get_record('user', array('id' => $manager->userid))) {
-                            $course = (object) [];
-                            $course->reporttext = $summary;
-                            $course->id = 0;
-                            mtrace("Sending completion summary report to $user->email");
-                            EmailTemplate::send('completion_digest_manager', array('user' => $user, 'course' => $course, 'company' => $companyobj));
-                        }
-                    }
+                if ($foundusers && $user = $DB->get_record('user', array('id' => $manager->userid))) {
+                    $course = (object) [];
+                    $course->reporttext = $summary;
+                    $course->id = 0;
+                    mtrace("Sending completion summary report to $user->email");
+                    EmailTemplate::send('completion_digest_manager', array('user' => $user, 'course' => $course, 'company' => $companyobj));
                 }
             }
         }
 
         mtrace("email reporting manager digest task completed at " . date('d M Y h:i:s', time()));
     }
-
 }

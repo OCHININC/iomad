@@ -646,7 +646,7 @@ function xmldb_local_email_upgrade($oldversion) {
 
         // Queue the task.
         \core\task\manager::queue_adhoc_task($addtask);
-        
+
         // Email savepoint reached.
         upgrade_plugin_savepoint(true, 2024032600, 'local', 'email');
     }
@@ -659,9 +659,29 @@ function xmldb_local_email_upgrade($oldversion) {
 
         // Queue the task.
         \core\task\manager::queue_adhoc_task($addtask);
-        
+
         // Email savepoint reached.
         upgrade_plugin_savepoint(true, 2024070100, 'local', 'email');
+    }
+
+    if ($oldversion < 2024111900) {
+
+        // Set up an AdHoc task to add the new email templates.
+        $addtask = new \local_email\task\addtemplate();
+        $addtask->set_custom_data(['templatename' => 'expiring_digest_manager', 'disabled' => 1]);
+
+        // Queue the task.
+        \core\task\manager::queue_adhoc_task($addtask);
+
+        // Set up an AdHoc task to add the new email templates.
+        $addtask = new \local_email\task\addtemplate();
+        $addtask->set_custom_data(['templatename' => 'warning_digest_manager', 'disabled' => 1]);
+
+        // Queue the task.
+        \core\task\manager::queue_adhoc_task($addtask);
+
+        // Email savepoint reached.
+        upgrade_plugin_savepoint(true, 2024111900, 'local', 'email');
     }
 
     return $result;

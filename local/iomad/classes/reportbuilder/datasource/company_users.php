@@ -62,15 +62,15 @@ class company_users extends datasource {
 
         $this->add_entity($companyusersentity
             ->add_join("JOIN {company_users} {$companyusersalias}
-                ON {$companyusersalias}.companyid = {$companyalias}.id")
+                ON ({$companyusersalias}.companyid = {$companyalias}.id
+                    AND {$departmentalias}.id = {$companyusersalias}.departmentid)")
         );
 
         // Join the department entity to the company entity.
 
         $this->add_entity($departmententity
             ->add_join("JOIN {department} {$departmentalias}
-                ON ({$departmentalias}.company = {$companyalias}.id
-                    AND {$departmentalias}.id = {$companyusersalias}.departmentid)")
+                ON {$departmentalias}.company = {$companyalias}.id")
         );
 
         // Join the user entity to the company issued entity.
@@ -94,8 +94,9 @@ class company_users extends datasource {
     public function get_default_columns(): array {
         return [
             'company:name',
-            'user:fullname',
             'department:name',
+            'user:fullname',
+            'user:email',
         ];
     }
 

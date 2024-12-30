@@ -496,7 +496,14 @@ if (!$event = $DB->get_record('trainingevent', array('id' => $cm->instance))) {
                 $alreadyattending = $DB->count_records('trainingevent_users', array('trainingeventid' => $chosenevent->id, 'waitlisted' => 0));
                 $user = $DB->get_record('user', array('id' => $userid));
                 $course = $DB->get_record('course', array('id' => $event->course));
-                if ($alreadyattending < $chosenlocation->capacity) {
+
+                // Is the capacity overridden?
+                if (!empty($chosenevent->coursecapacity)) {
+                    $chosenlocation->capacity = $chosenevent->coursecapacity;
+                }
+
+                // Check for availability.
+                if (!empty($chosenlocation->isvirtual) || $alreadyattending < $chosenlocation->capacity) {
                     // What kind of event is this?
                     if ($chosenevent->approvaltype == 0 || $chosenevent->approvaltype == 4 || $myapprovallevel == "company" ||
                         ($chosenevent->approvaltype == 1 && $myapprovallevel == "department")) {
@@ -600,12 +607,16 @@ if (!$event = $DB->get_record('trainingevent', array('id' => $cm->instance))) {
                         }
 
                         // Remove from the users calendar.
-                        if ($calendareventrec = $DB->get_record('event', ['userid' => $user->id,
-                                                                         'courseid' => 0,
-                                                                         'modulename' => 'trainingevent',
-                                                                         'instance' => $event->id])) {
-                            $calendarevent = calendar_event::load($calendareventrec->id);
-                            $calendarevent->delete(true);
+                        if ($calendareventrecs = $DB->get_records('event',
+                                                                  ['userid' => $user->id,
+                                                                   'courseid' => 0,
+                                                                   'modulename' => 'trainingevent',
+                                                                   'instance' => $event->id])) {
+
+                            foreach ($calendareventrecs as $calendareventrec) {
+                                $calendarevent = calendar_event::load($calendareventrec->id);
+                                $calendarevent->delete(true);
+                            }
                         }
 
                         // Fire an event for this.
@@ -1317,6 +1328,9 @@ if (!$event = $DB->get_record('trainingevent', array('id' => $cm->instance))) {
                 $currentcount = $DB->count_records('trainingevent_users',
                                                    ['trainingeventid' => $courseevent->id,
                                                    'waitlisted' => 0]);
+                if (empty($courseevent->coursecapacity)) {
+                    $courseevent->coursecapacity = $DB->get_field('classroom', 'capacity', ['id' => $courseevent->classroomid]);
+                }
                 if ($currentcount < $courseevent->coursecapacity) {
                     $courselocation = $DB->get_record('classroom', array('id' => $courseevent->classroomid));
                     $eventselect[$courseevent->id] = $courseevent->name . ' - ' . $courselocation->name.

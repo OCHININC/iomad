@@ -23,6 +23,7 @@
 
 $string['add_template_button'] = 'Override';
 $string['addnewtemplate'] = 'Override a default template';
+$string['addtemplateadhoc'] = 'Add new email template adhoc task';
 $string['applytemplateset'] = 'Apply templateset \'{$a}\' to companies';
 $string['backtocompanytemplates'] = 'Finish editing template set';
 $string['blocktitle'] = 'Email templates';
@@ -160,7 +161,9 @@ $string['license_removed_name'] = 'User course licese revoked';
 $string['password_update_name'] = 'User password changed';
 $string['completion_warn_user_name'] = 'User course completion warning';
 $string['completion_warn_manager_name'] = 'Manager course completion warning report';
-$string['completion_digest_manager_name'] = 'Manager course completion warning report - digest';
+$string['completion_digest_manager_name'] = 'Manager course completions weekly report - digest';
+$string['expiring_digest_manager_name'] = 'Manager courses expiring weekly warning report - digest';
+$string['warning_digest_manager_name'] = 'Manager courses not completed weekly warning report - digest';
 $string['expiry_warn_user_name'] = 'User training expiry warning';
 $string['expiry_warn_manager_name'] = 'Manager training expiry warning';
 $string['expire_name'] = 'User training expired';
@@ -210,7 +213,9 @@ $string['license_removed_name_help'] = 'Template sent out to a user when a cours
 $string['password_update_name_help'] = 'Template sent out to a user when their password has been changed by a manager.';
 $string['completion_warn_user_name_help'] = 'Template sent out to a user when they have not completed a course in the configured time.';
 $string['completion_warn_manager_name_help'] = 'Template sent out to a manager informing them that a user has not completed a course in the configured time.';
-$string['completion_digest_manager_name_help'] = 'Template sent out to a manager informing them that users have not completed courses in a configured time when the manager emails are sent as a digest.';
+$string['completion_digest_manager_name_help'] = 'Template sent out to a manager informing them of the users that completed courses in the last week. The manager emails are sent as a digest.';
+$string['expiring_digest_manager_name_help'] = 'Template sent out to a manager informing them that users have courses expiring in the next week. The manager emails are sent as a digest.';
+$string['warning_digest_manager_name_help'] = 'Template sent out to a manager informing them that users have not completed courses in the last week. The manager emails are sent as a digest.';
 $string['expiry_warn_user_name_help'] = 'Template sent out to a user when their training in a course is due to expire.';
 $string['expiry_warn_manager_name_help'] = 'Template sent out to managers informing them of users who training is due to expire.';
 $string['expire_name_help'] = 'Template sent out to a user when their training in a course has expired.';
@@ -421,10 +426,18 @@ $string['completion_warn_manager_body'] = '<p>Dear {User_FirstName},</p>
 <p>the following users have not completed their training within the normal timeframe :</p>
 
 <p>{Course_ReportText}</p>';
-$string['completion_digest_manager_subject'] = 'User completion report';
+$string['completion_digest_manager_subject'] = 'User course completions weekly report';
 $string['completion_digest_manager_body'] = '<p>Dear {User_FirstName},</p>
 <p>the following users have completed their training within the last week :</p>
 
+<p>{Course_ReportText}</p>';
+$string['expiring_digest_manager_subject'] = 'User courses expiring weekly report';
+$string['expiring_digest_manager_body'] = '<p>Dear {User_FirstName},</p>
+<p>The following users have training expiring within the next week:</p>
+<p>{Course_ReportText}</p>';
+$string['warning_digest_manager_subject'] = 'User courses not completed weekly report';
+$string['warning_digest_manager_body'] = '<p>Dear {User_FirstName},</p>
+<p>The following users have not completed their training within the required time limit:</p>
 <p>{Course_ReportText}</p>';
 $string['expiry_warn_user_subject'] = 'Notice: Accreditation in {Course_FullName} will expire soon.';
 $string['expiry_warn_user_body'] = '<p>Dear {User_FirstName},</p>

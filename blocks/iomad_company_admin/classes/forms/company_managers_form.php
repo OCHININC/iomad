@@ -135,6 +135,10 @@ class company_managers_form extends moodleform {
             $this->selectedcompany).
             '">Create one now</a>');
         }
+
+        // Disable the onchange popup.
+        $mform->disable_form_change_checker();
+
     }
 
     public function process($departmentid, $roletype) {

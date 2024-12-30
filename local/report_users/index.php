@@ -241,7 +241,6 @@ echo html_writer::start_tag('div', array('class' => 'iomadclear'));
 $stredit   = get_string('edit');
 $strdelete = get_string('delete');
 $strdeletecheck = get_string('deletecheck');
-$strshowallusers = get_string('showallusers');
 
 $returnurl = $CFG->wwwroot."/local/report_users/index.php";
 

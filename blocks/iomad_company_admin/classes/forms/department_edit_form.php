@@ -32,14 +32,12 @@ class department_edit_form extends company_moodleform {
     protected $deptid = 0;
     protected $output = null;
 
-    public function __construct($actionurl, $companyid, $departmentid, $output, $chosenid=0, $action=0) {
+    public function __construct($actionurl, $companyid, $departmentid, $output) {
         global $CFG, $DB;
 
         $this->selectedcompany = $companyid;
         $this->departmentid = $departmentid;
         $this->output = $output;
-        $this->chosenid = $chosenid;
-        $this->action = $action;
         if (!empty($departmentid)) {
             $this->department = $DB->get_record('department', array('id' => $departmentid));
             $this->parentid = $this->department->parent;
@@ -62,7 +60,7 @@ class department_edit_form extends company_moodleform {
         }
 
         // Then show the fields about where this block appears.
-        if ($this->action == 0) {
+        if (empty($this->department)) {
             $mform->addElement('header', 'header',
                                 get_string('createdepartment', 'block_iomad_company_admin'));
         } else {
@@ -71,8 +69,6 @@ class department_edit_form extends company_moodleform {
         }
         $mform->addElement('hidden', 'departmentid', $this->departmentid);
         $mform->setType('departmentid', PARAM_INT);
-        $mform->addElement('hidden', 'action', $this->action);
-        $mform->setType('action', PARAM_INT);
 
         // Display department select html (create only)
         $mform->addElement('html', '<p>' . get_string('parentdepartment', 'block_iomad_company_admin') . '</p>');
@@ -96,13 +92,6 @@ class department_edit_form extends company_moodleform {
                          'required', null, 'client');
         $mform->setType('shortname', PARAM_MULTILANG);
 
-        if (!$this->departmentid) {
-            $mform->addElement('hidden', 'chosenid', $this->chosenid);
-        } else {
-            $mform->addElement('hidden', 'chosenid', $this->departmentid);
-        }
-        $mform->setType('chosenid', PARAM_INT);
-
         $this->add_action_buttons();
     }
 
@@ -116,6 +105,12 @@ class department_edit_form extends company_moodleform {
                 $errors['shortname'] = get_string('departmentnameinuse', 'block_iomad_company_admin');
             }
         }
+
+        if (!preg_match('/^[A-Za-z0-9_]+$/', trim($data['shortname']))) {
+            // Check allowed pattern (numbers, letters and underscore).
+            $errors['shortname'] = get_string('invalidshortnameerror', 'core_customfield');
+        }
+
         return $errors;
     }
 }
