@@ -61,3 +61,6 @@
 [submodule "filter/shortcodes"]
 	path = filter/shortcodes
 	url = https://github.com/branchup/moodle-filter_shortcodes.git
+[submodule "admin/tool/ochinshortcodes"]
+	path = admin/tool/ochinshortcodes
+	url = https://github.com/OCHININC/ella-tool_ochinshortcodes.git
